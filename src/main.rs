@@ -31,18 +31,18 @@ fn parse(source: &String) -> Option<i64> {
 
 fn compile(number: i64) -> String {
     format!(
-        "    section .text:
-            global boot
-        boot:
-            mov rax, {}
-            ret
-        ",
+"    section .text
+    global boot
+boot:
+    mov rax, {}
+    ret
+",
         number
     )
 }
 
 fn dump(file_path: &String, output: &String) -> std::io::Result<()> {
-    let mut output_file = File::create(format!("{}.asm", file_path))?;
+    let mut output_file = File::create(format!("{}.s", file_path))?;
     let bytes_written = output_file.write(output.as_bytes())?;
     println!("written {} bytes", bytes_written);
     Ok(())
