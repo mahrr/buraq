@@ -14,7 +14,7 @@ rm -rf build/
 mkdir build/
 
 # run the buraq compile to output assembly file
-cargo run $1
+cargo run $1 > "build/$file_name.s"
 
 # check if if compilation failed
 if [ $? -ne 0 ]; then
@@ -22,11 +22,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# move the assembly file to build dir
-mv $1.s build/
-
 # convert the assembly file to an object file
-nasm -f elf64 build/$path_base.s -o build/$file_name.o
+nasm -f elf64 build/$file_name.s -o build/$file_name.o
 
 # check if the assembler failed
 if [ $? -ne 0 ]; then

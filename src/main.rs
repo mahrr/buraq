@@ -1,9 +1,10 @@
 use std::{
     env,
-    fs::{self, File},
-    io::Write,
+    fs::{self},
     process,
 };
+
+mod sexpr;
 
 fn parse(source: &String) -> Option<i64> {
     let mut result = 0i64;
@@ -31,7 +32,7 @@ fn parse(source: &String) -> Option<i64> {
 
 fn compile(number: i64) -> String {
     format!(
-"    section .text
+        "    section .text
     global boot
 boot:
     mov rax, {}
@@ -39,13 +40,6 @@ boot:
 ",
         number
     )
-}
-
-fn dump(file_path: &String, output: &String) -> std::io::Result<()> {
-    let mut output_file = File::create(format!("{}.s", file_path))?;
-    let bytes_written = output_file.write(output.as_bytes())?;
-    println!("written {} bytes", bytes_written);
-    Ok(())
 }
 
 fn main() {
@@ -59,24 +53,35 @@ fn main() {
 
     match fs::read_to_string(file_path) {
         Ok(content) => {
-            let number = match parse(&content) {
-                Some(number) => number,
-                None => {
-                    eprintln!("parse error: invalid number");
+            let sexpr = match sexpr::parse(&content) {
+                Ok(sexpr) => sexpr,
+                Err(err) => {
+                    eprintln!("error: {}", err);
                     process::exit(1);
                 }
             };
 
-            match dump(file_path, &compile(number)) {
-                Ok(()) => {}
-                Err(error) => {
-                    eprintln!("io error: {}", error);
+            println!("; SEXPR: {:?}", sexpr);
+
+            let number = match sexpr {
+                sexpr::SExpr::Symbol(symb) => {
+                    if let Some(number) = parse(&symb) {
+                        number
+                    } else {
+                        eprintln!("error: expect a number");
+                        process::exit(1);
+                    }
+                }
+                _ => {
+                    eprintln!("error: expect a number");
                     process::exit(1);
                 }
-            }
+            };
+
+            print!("{}", compile(number));
         }
         Err(error) => {
-            eprintln!("io error: {}", error);
+            eprintln!("error: {}", error);
             process::exit(1);
         }
     }

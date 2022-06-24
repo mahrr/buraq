@@ -1,6 +1,7 @@
+use std::fmt;
 use std::iter::Peekable;
 
-// == S-Expression Parser ==
+// S-Expression Parser
 
 #[derive(Debug)]
 pub enum SExpr {
@@ -19,7 +20,16 @@ fn consume_whitespace<I: Iterator<Item = char>>(it: &mut Peekable<I>) {
     while let Some(_) = it.next_if(|ch| ch.is_ascii_whitespace()) {}
 }
 
-fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Option<SExpr> {
+#[derive(Debug, Clone)]
+pub struct ParseError;
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Parse Error")
+    }
+}
+
+fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Result<SExpr, ParseError> {
     consume_whitespace(it);
 
     match it.peek() {
@@ -33,14 +43,10 @@ fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Option<SExpr> {
                     break;
                 }
 
-                if let Some(expr) = parse_impl(it) {
-                    elements.push(expr);
-                } else {
-                    // TODO: error handling
-                    todo!();
-                }
+                let expr = parse_impl(it)?;
+                elements.push(expr);
             }
-            Some(SExpr::List(elements))
+            Ok(SExpr::List(elements))
         }
         Some(_) => {
             let mut symbol: String = String::new();
@@ -48,17 +54,15 @@ fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Option<SExpr> {
                 symbol.push(ch);
             }
 
-            // TODO: error handling
             if symbol.len() == 0 {
-                todo!()
+                return Err(ParseError);
             }
-
-            Some(SExpr::Symbol(symbol))
+            Ok(SExpr::Symbol(symbol))
         }
-        None => None,
+        None => Err(ParseError),
     }
 }
 
-pub fn parse(source: &String) -> Option<SExpr> {
+pub fn parse(source: &String) -> Result<SExpr, ParseError> {
     parse_impl(&mut source.chars().peekable())
 }
