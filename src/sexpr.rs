@@ -10,10 +10,7 @@ pub enum SExpr {
 }
 
 fn is_delimiter(ch: char) -> bool {
-    match ch {
-        '(' | ')' => true,
-        _ => ch.is_ascii_whitespace(),
-    }
+    ch == '(' || ch == ')' || ch.is_ascii_whitespace()
 }
 
 fn consume_whitespace<I: Iterator<Item = char>>(it: &mut Peekable<I>) {
@@ -21,15 +18,15 @@ fn consume_whitespace<I: Iterator<Item = char>>(it: &mut Peekable<I>) {
 }
 
 #[derive(Debug, Clone)]
-pub struct ParseError;
+pub struct Error;
 
-impl fmt::Display for ParseError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Parse Error")
+        write!(f, "invalid s-expression")
     }
 }
 
-fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Result<SExpr, ParseError> {
+fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Result<SExpr, Error> {
     consume_whitespace(it);
 
     match it.peek() {
@@ -42,9 +39,7 @@ fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Result<SExpr, P
                 if let Some(_) = it.next_if_eq(&')') {
                     break;
                 }
-
-                let expr = parse_impl(it)?;
-                elements.push(expr);
+                elements.push(parse_impl(it)?);
             }
             Ok(SExpr::List(elements))
         }
@@ -55,14 +50,14 @@ fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Result<SExpr, P
             }
 
             if symbol.len() == 0 {
-                return Err(ParseError);
+                return Err(Error);
             }
             Ok(SExpr::Symbol(symbol))
         }
-        None => Err(ParseError),
+        None => Err(Error),
     }
 }
 
-pub fn parse(source: &String) -> Result<SExpr, ParseError> {
+pub fn parse(source: &String) -> Result<SExpr, Error> {
     parse_impl(&mut source.chars().peekable())
 }
