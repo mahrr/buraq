@@ -31,51 +31,47 @@ fn compile(expr: parser::Expr) -> String {
             let left = compile(*left);
             let right = compile(*right);
             format!(
-                "    {}
+                "    {left}
     push rax
-    {}
+    {right}
     pop rbx
-    add rax, rbx",
-                left, right
+    add rax, rbx"
             )
         }
         Expr::Sub(left, right) => {
             let left = compile(*left);
             let right = compile(*right);
             format!(
-                "    {}
+                "    {left}
     push rax
-    {}
+    {right}
     mov rbx, rax
     pop rax
-    sub rax, rbx",
-                left, right
+    sub rax, rbx"
             )
         }
         Expr::Mul(left, right) => {
             let left = compile(*left);
             let right = compile(*right);
             format!(
-                "    {}
+                "    {left}
     push rax
-    {}
+    {right}
     pop rbx
-    mul rbx",
-                left, right
+    mul rbx"
             )
         }
         Expr::Div(left, right) => {
             let left = compile(*left);
             let right = compile(*right);
             format!(
-                "    {}
+                "    {left}
     push rax
-    {}
+    {right}
     mov rbx, rax
     pop rax
     xor rdx, rdx
-    idiv rbx",
-                left, right
+    idiv rbx"
             )
         }
 
@@ -84,75 +80,70 @@ fn compile(expr: parser::Expr) -> String {
             let left = compile(*left);
             let right = compile(*right);
             format!(
-                "    {}
+                "    {left}
     push rax
-    {}
+    {right}
     pop rbx
     cmp rbx, rax
     mov rax, 0
     mov rbx, 1
-    cmovl rax, rbx",
-                left, right
+    cmovl rax, rbx"
             )
         }
         Expr::GT(left, right) => {
             let left = compile(*left);
             let right = compile(*right);
             format!(
-                "    {}
+                "    {left}
     push rax
-    {}
+    {right}
     pop rbx
     cmp rbx, rax
     mov rax, 0
     mov rbx, 1
-    cmovg rax, rbx",
-                left, right
+    cmovg rax, rbx"
             )
         }
         Expr::LE(left, right) => {
             let left = compile(*left);
             let right = compile(*right);
             format!(
-                "    {}
+                "    {left}
     push rax
-    {}
+    {right}
     pop rbx
     cmp rbx, rax
     mov rax, 0
     mov rbx, 1
-    cmovle rax, rbx",
-                left, right
+    cmovle rax, rbx"
             )
         }
         Expr::GE(left, right) => {
             let left = compile(*left);
             let right = compile(*right);
             format!(
-                "    {}
+                "    {left}
     push rax
-    {}
+    {right}
     pop rbx
     cmp rbx, rax
     mov rax, 0
     mov rbx, 1
-    cmovge rax, rbx",
-                left, right
+    cmovge rax, rbx"
             )
         }
         Expr::EQ(left, right) => {
             let left = compile(*left);
             let right = compile(*right);
             format!(
-                "    {}
+                "    {left}
     push rax
-    {}
+    {right}
     pop rbx
     cmp rbx, rax
     mov rax, 0
     mov rbx, 1
-    cmove rax, rbx",
-                left, right
+    cmove rax, rbx"
             )
         }
 
