@@ -26,6 +26,45 @@ fn compile(expr: parser::Expr) -> String {
                 left, right
             )
         }
+        Expr::Sub(left, right) => {
+            let left = compile(*left);
+            let right = compile(*right);
+            format!(
+                "    {}
+    push rax
+    {}
+    mov rbx, rax
+    pop rax
+    sub rax, rbx",
+                left, right
+            )
+        }
+        Expr::Mul(left, right) => {
+            let left = compile(*left);
+            let right = compile(*right);
+            format!(
+                "    {}
+    push rax
+    {}
+    pop rbx
+    mul rbx",
+                left, right
+            )
+        }
+        Expr::Div(left, right) => {
+            let left = compile(*left);
+            let right = compile(*right);
+            format!(
+                "    {}
+    push rax
+    {}
+    mov rbx, rax
+    pop rax
+    xor rdx, rdx
+    idiv rbx",
+                left, right
+            )
+        }
     }
 }
 

@@ -4,6 +4,9 @@ use std::fmt;
 pub enum Expr {
     Integer(i64),
     Add(Box<Expr>, Box<Expr>),
+    Sub(Box<Expr>, Box<Expr>),
+    Mul(Box<Expr>, Box<Expr>),
+    Div(Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +55,22 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::Add(left, right))
-            }
+            },
+            [SExpr::Symbol(op), left, right] if op == "-" => {
+                let left = Box::new(parse(left)?);
+                let right = Box::new(parse(right)?);
+                Ok(Expr::Sub(left, right))
+            },
+            [SExpr::Symbol(op), left, right] if op == "*" => {
+                let left = Box::new(parse(left)?);
+                let right = Box::new(parse(right)?);
+                Ok(Expr::Mul(left, right))
+            },
+            [SExpr::Symbol(op), left, right] if op == "/" => {
+                let left = Box::new(parse(left)?);
+                let right = Box::new(parse(right)?);
+                Ok(Expr::Div(left, right))
+            },
             _ => Err(Error),
         },
     }
