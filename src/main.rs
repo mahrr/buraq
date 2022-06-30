@@ -7,6 +7,16 @@ use std::{
 mod parser;
 mod sexpr;
 
+fn generate_label(label: &str) -> String {
+    static mut ID: u64 = 0;
+    let id: u64;
+    unsafe {
+        id = ID;
+        ID += 1;
+    }
+    format!("{}_{}", label, id)
+}
+
 fn compile(expr: parser::Expr) -> String {
     use parser::*;
 
@@ -143,6 +153,25 @@ fn compile(expr: parser::Expr) -> String {
     mov rbx, 1
     cmove rax, rbx",
                 left, right
+            )
+        }
+
+        // if
+        Expr::If(cond, then, else_) => {
+            let else_label = generate_label("else");
+            let end_label = generate_label("if_end");
+            let cond = compile(*cond);
+            let then = compile(*then);
+            let else_ = compile(*else_);
+            format!(
+                "    {cond}
+    cmp rax, 1
+    jne near {else_label}
+    {then}
+    jmp near {end_label}
+{else_label}:
+    {else_}
+{end_label}:"
             )
         }
     }

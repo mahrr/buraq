@@ -4,7 +4,7 @@ use std::fmt;
 pub enum Expr {
     Boolean(bool),
     Integer(i64),
-    Add(Box<Expr>, Box<Expr>),
+    Add(Box<Expr>, Box<Expr>), // left, right
     Sub(Box<Expr>, Box<Expr>),
     Mul(Box<Expr>, Box<Expr>),
     Div(Box<Expr>, Box<Expr>),
@@ -13,6 +13,7 @@ pub enum Expr {
     LE(Box<Expr>, Box<Expr>),
     GE(Box<Expr>, Box<Expr>),
     EQ(Box<Expr>, Box<Expr>),
+    If(Box<Expr>, Box<Expr>, Box<Expr>), // cond, then, else
 }
 
 #[derive(Debug, Clone)]
@@ -63,6 +64,7 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
             Err(Error)
         }
         SExpr::List(elements) => match &elements[..] {
+            // arithmetics
             [SExpr::Symbol(op), left, right] if op == "+" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
@@ -83,6 +85,8 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                 let right = Box::new(parse(right)?);
                 Ok(Expr::Div(left, right))
             }
+
+            // comparison
             [SExpr::Symbol(op), left, right] if op == "<" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
@@ -107,6 +111,14 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::EQ(left, right))
+            }
+
+            // if
+            [SExpr::Symbol(keyword), cond, then, else_] if keyword == "if" => {
+                let cond = Box::new(parse(cond)?);
+                let then = Box::new(parse(then)?);
+                let else_ = Box::new(parse(else_)?);
+                Ok(Expr::If(cond, then, else_))
             }
             _ => Err(Error),
         },
