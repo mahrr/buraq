@@ -2,6 +2,7 @@ use crate::sexpr::SExpr;
 use std::fmt;
 
 pub enum Expr {
+    Boolean(bool),
     Integer(i64),
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
@@ -48,6 +49,12 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
             if let Some(number) = parse_integer(&symbol) {
                 return Ok(Expr::Integer(number));
             }
+            if symbol == "true" {
+                return Ok(Expr::Boolean(true));
+            }
+            if symbol == "false" {
+                return Ok(Expr::Boolean(false));
+            }
             Err(Error)
         }
         SExpr::List(elements) => match &elements[..] {
@@ -55,22 +62,22 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::Add(left, right))
-            },
+            }
             [SExpr::Symbol(op), left, right] if op == "-" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::Sub(left, right))
-            },
+            }
             [SExpr::Symbol(op), left, right] if op == "*" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::Mul(left, right))
-            },
+            }
             [SExpr::Symbol(op), left, right] if op == "/" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::Div(left, right))
-            },
+            }
             _ => Err(Error),
         },
     }

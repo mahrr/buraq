@@ -11,9 +11,12 @@ fn compile(expr: parser::Expr) -> String {
     use parser::*;
 
     match expr {
-        Expr::Integer(number) => {
-            format!("mov rax, {}", number)
-        }
+        // literals
+        Expr::Boolean(true) => String::from("mov rax, 1"),
+        Expr::Boolean(false) => String::from("mov rax, 0"),
+        Expr::Integer(number) => format!("mov rax, {}", number),
+
+        // arithmetics
         Expr::Add(left, right) => {
             let left = compile(*left);
             let right = compile(*right);
@@ -97,8 +100,6 @@ fn main() {
                     process::exit(1);
                 }
             };
-
-            println!("; SEXPR: {:?}", sexpr);
 
             match parser::parse(&sexpr) {
                 Ok(expr) => println!("{}", compile_program(expr)),
