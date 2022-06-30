@@ -200,7 +200,10 @@ fn main() {
 
             match parser::parse(&sexpr) {
                 Ok(expr) => println!("{}", compile_program(expr)),
-                Err(error) => println!("error: {}", error),
+                Err(error) => {
+                    eprintln!("error: {}", error);
+                    process::exit(1);
+                }
             }
         }
         Err(error) => {

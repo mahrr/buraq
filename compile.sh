@@ -18,7 +18,7 @@ cargo run $1 > "build/$file_name.s"
 
 # check if if compilation failed
 if [ $? -ne 0 ]; then
-    echo "error: compilation failed!"
+    echo "[compile.sh]: compilation failed!"
     exit 1
 fi
 
@@ -27,7 +27,7 @@ nasm -f elf64 build/$file_name.s -o build/$file_name.o
 
 # check if the assembler failed
 if [ $? -ne 0 ]; then
-    echo "error: assembler failed!"
+    echo "[compile.sh]: assembler failed!"
     exit 1
 fi
 
@@ -36,6 +36,6 @@ gcc -no-pie -g -mstackrealign -o build/$file_name src/runtime.c build/$file_name
 
 # check if linking failed
 if [ $? -ne 0 ]; then
-    echo "error: linking failed!"
+    echo "[compile.sh]: linking failed!"
     exit 1
 fi

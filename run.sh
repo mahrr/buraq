@@ -12,5 +12,7 @@ file_name="${path_base%.*}"
 # invoke the compilation script
 ./compile.sh $1
 
-# run the resulted executable
-./build/$file_name
+# run the resulted executable, if compilation not failed
+if [ $? == 0 ]; then
+    ./build/$file_name
+fi
