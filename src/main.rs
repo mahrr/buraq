@@ -4,41 +4,39 @@ use std::{
     process,
 };
 
+mod parser;
 mod sexpr;
 
-fn parse(source: &String) -> Option<i64> {
-    let mut result = 0i64;
-    let mut chars = source.chars();
+fn compile(expr: parser::Expr) -> String {
+    use parser::*;
 
-    match chars.next() {
-        Some(ch) => match ch.to_digit(10) {
-            Some(number) => result += number as i64,
-            None => return None,
-        },
-        None => {
-            return None;
+    match expr {
+        Expr::Integer(number) => {
+            format!("mov rax, {}", number)
         }
-    };
-
-    while let Some(ch) = chars.next() {
-        match ch.to_digit(10) {
-            Some(number) => result = result * 10 + number as i64,
-            None => break,
+        Expr::Add(left, right) => {
+            let left = compile(*left);
+            let right = compile(*right);
+            format!(
+                "    {}
+    push rax
+    {}
+    pop rbx
+    add rax, rbx",
+                left, right
+            )
         }
     }
-
-    return Some(result);
 }
 
-fn compile(number: i64) -> String {
+fn compile_program(expr: parser::Expr) -> String {
     format!(
         "    section .text
     global boot
 boot:
-    mov rax, {}
-    ret
-",
-        number
+{}
+    ret",
+        compile(expr)
     )
 }
 
@@ -63,22 +61,10 @@ fn main() {
 
             println!("; SEXPR: {:?}", sexpr);
 
-            let number = match sexpr {
-                sexpr::SExpr::Symbol(symb) => {
-                    if let Some(number) = parse(&symb) {
-                        number
-                    } else {
-                        eprintln!("error: expect a number");
-                        process::exit(1);
-                    }
-                }
-                _ => {
-                    eprintln!("error: expect a number");
-                    process::exit(1);
-                }
-            };
-
-            print!("{}", compile(number));
+            match parser::parse(&sexpr) {
+                Ok(expr) => println!("{}", compile_program(expr)),
+                Err(error) => println!("error: {}", error),
+            }
         }
         Err(error) => {
             eprintln!("error: {}", error);

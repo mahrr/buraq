@@ -9,14 +9,6 @@ pub enum SExpr {
     List(Vec<SExpr>),
 }
 
-fn is_delimiter(ch: char) -> bool {
-    ch == '(' || ch == ')' || ch.is_ascii_whitespace()
-}
-
-fn consume_whitespace<I: Iterator<Item = char>>(it: &mut Peekable<I>) {
-    while let Some(_) = it.next_if(|ch| ch.is_ascii_whitespace()) {}
-}
-
 #[derive(Debug, Clone)]
 pub struct Error;
 
@@ -24,6 +16,14 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "invalid s-expression")
     }
+}
+
+fn is_delimiter(ch: char) -> bool {
+    ch == '(' || ch == ')' || ch.is_ascii_whitespace()
+}
+
+fn consume_whitespace<I: Iterator<Item = char>>(it: &mut Peekable<I>) {
+    while let Some(_) = it.next_if(|ch| ch.is_ascii_whitespace()) {}
 }
 
 fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Result<SExpr, Error> {
