@@ -8,6 +8,11 @@ pub enum Expr {
     Sub(Box<Expr>, Box<Expr>),
     Mul(Box<Expr>, Box<Expr>),
     Div(Box<Expr>, Box<Expr>),
+    LT(Box<Expr>, Box<Expr>),
+    GT(Box<Expr>, Box<Expr>),
+    LE(Box<Expr>, Box<Expr>),
+    GE(Box<Expr>, Box<Expr>),
+    EQ(Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +82,31 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::Div(left, right))
+            }
+            [SExpr::Symbol(op), left, right] if op == "<" => {
+                let left = Box::new(parse(left)?);
+                let right = Box::new(parse(right)?);
+                Ok(Expr::LT(left, right))
+            }
+            [SExpr::Symbol(op), left, right] if op == ">" => {
+                let left = Box::new(parse(left)?);
+                let right = Box::new(parse(right)?);
+                Ok(Expr::GT(left, right))
+            }
+            [SExpr::Symbol(op), left, right] if op == "<=" => {
+                let left = Box::new(parse(left)?);
+                let right = Box::new(parse(right)?);
+                Ok(Expr::LE(left, right))
+            }
+            [SExpr::Symbol(op), left, right] if op == ">=" => {
+                let left = Box::new(parse(left)?);
+                let right = Box::new(parse(right)?);
+                Ok(Expr::GE(left, right))
+            }
+            [SExpr::Symbol(op), left, right] if op == "=" => {
+                let left = Box::new(parse(left)?);
+                let right = Box::new(parse(right)?);
+                Ok(Expr::EQ(left, right))
             }
             _ => Err(Error),
         },

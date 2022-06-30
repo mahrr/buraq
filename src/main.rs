@@ -68,6 +68,83 @@ fn compile(expr: parser::Expr) -> String {
                 left, right
             )
         }
+
+        // comparison
+        Expr::LT(left, right) => {
+            let left = compile(*left);
+            let right = compile(*right);
+            format!(
+                "    {}
+    push rax
+    {}
+    pop rbx
+    cmp rbx, rax
+    mov rax, 0
+    mov rbx, 1
+    cmovl rax, rbx",
+                left, right
+            )
+        }
+        Expr::GT(left, right) => {
+            let left = compile(*left);
+            let right = compile(*right);
+            format!(
+                "    {}
+    push rax
+    {}
+    pop rbx
+    cmp rbx, rax
+    mov rax, 0
+    mov rbx, 1
+    cmovg rax, rbx",
+                left, right
+            )
+        }
+        Expr::LE(left, right) => {
+            let left = compile(*left);
+            let right = compile(*right);
+            format!(
+                "    {}
+    push rax
+    {}
+    pop rbx
+    cmp rbx, rax
+    mov rax, 0
+    mov rbx, 1
+    cmovle rax, rbx",
+                left, right
+            )
+        }
+        Expr::GE(left, right) => {
+            let left = compile(*left);
+            let right = compile(*right);
+            format!(
+                "    {}
+    push rax
+    {}
+    pop rbx
+    cmp rbx, rax
+    mov rax, 0
+    mov rbx, 1
+    cmovge rax, rbx",
+                left, right
+            )
+        }
+        Expr::EQ(left, right) => {
+            let left = compile(*left);
+            let right = compile(*right);
+            format!(
+                "    {}
+    push rax
+    {}
+    pop rbx
+    cmp rbx, rax
+    mov rax, 0
+    mov rbx, 1
+    cmove rax, rbx",
+                left, right
+            )
+        }
     }
 }
 
