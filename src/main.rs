@@ -186,29 +186,34 @@ fn main() {
         process::exit(1);
     }
 
+    // read file content
     let file_path = &args[1];
-
-    match fs::read_to_string(file_path) {
-        Ok(content) => {
-            let sexpr = match sexpr::parse(&content) {
-                Ok(sexpr) => sexpr,
-                Err(err) => {
-                    eprintln!("error: {}", err);
-                    process::exit(1);
-                }
-            };
-
-            match parser::parse(&sexpr) {
-                Ok(expr) => println!("{}", compile_program(expr)),
-                Err(error) => {
-                    eprintln!("error: {}", error);
-                    process::exit(1);
-                }
-            }
-        }
+    let file_content = match fs::read_to_string(file_path) {
+        Ok(content) => content,
         Err(error) => {
-            eprintln!("error: {}", error);
+            eprintln!("error: {error}");
             process::exit(1);
         }
-    }
+    };
+
+    // parse the source code into an S-Expression
+    let sexpr = match sexpr::parse(&file_content) {
+        Ok(sexpr) => sexpr,
+        Err(error) => {
+            eprintln!("error: {error}");
+            process::exit(1);
+        }
+    };
+
+    // parse the S-Expression into a Buraq expression
+    let expr = match parser::parse(&sexpr) {
+        Ok(expr) => expr,
+        Err(error) => {
+            eprintln!("error: {error}");
+            process::exit(1);
+        }
+    };
+
+    // compile the expression and dump the result to stdout
+    println!("{}", compile_program(expr));
 }
