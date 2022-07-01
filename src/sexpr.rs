@@ -3,13 +3,13 @@ use std::iter::Peekable;
 
 // S-Expression Parser
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum SExpr {
     Symbol(String),
     List(Vec<SExpr>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Error;
 
 impl fmt::Display for Error {
@@ -60,4 +60,70 @@ fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Result<SExpr, E
 
 pub fn parse(source: &String) -> Result<SExpr, Error> {
     parse_impl(&mut source.chars().peekable())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse() {
+        let symbol = String::from("foo");
+        assert_eq!(parse(&symbol), Ok(SExpr::Symbol(symbol)));
+
+        let symbol = String::from("foo-bar");
+        assert_eq!(parse(&symbol), Ok(SExpr::Symbol(symbol)));
+
+        let symbol = String::from("091500");
+        assert_eq!(parse(&symbol), Ok(SExpr::Symbol(symbol)));
+
+        let symbol = String::from("@+/#$%^&*?1aA_");
+        assert_eq!(parse(&symbol), Ok(SExpr::Symbol(symbol)));
+
+        let list = String::from("()");
+        assert_eq!(parse(&list), Ok(SExpr::List(vec![])));
+
+        let list = String::from("(foo bar baz)");
+        assert_eq!(
+            parse(&list),
+            Ok(SExpr::List(vec![
+                SExpr::Symbol("foo".to_string()),
+                SExpr::Symbol("bar".to_string()),
+                SExpr::Symbol("baz".to_string())
+            ]))
+        );
+
+        let list = String::from("(())");
+        assert_eq!(parse(&list), Ok(SExpr::List(vec![SExpr::List(vec![])])));
+
+        let list = String::from("(foo bar (baz))");
+        assert_eq!(
+            parse(&list),
+            Ok(SExpr::List(vec![
+                SExpr::Symbol("foo".to_string()),
+                SExpr::Symbol("bar".to_string()),
+                SExpr::List(vec![SExpr::Symbol("baz".to_string())])
+            ]))
+        );
+
+        let list = String::from("(foo (bar (baz) qux) foo)");
+        assert_eq!(
+            parse(&list),
+            Ok(SExpr::List(vec![
+                SExpr::Symbol("foo".to_string()),
+                SExpr::List(vec![
+                    SExpr::Symbol("bar".to_string()),
+                    SExpr::List(vec![SExpr::Symbol("baz".to_string())]),
+                    SExpr::Symbol("qux".to_string())
+                ]),
+                SExpr::Symbol("foo".to_string()),
+            ]))
+        );
+
+        // invalid S-Expressions
+        assert_eq!(parse(&String::from("")), Err(Error));
+        assert_eq!(parse(&String::from(")foo bar)")), Err(Error));
+        assert_eq!(parse(&String::from("(foo bar")), Err(Error));
+        assert_eq!(parse(&String::from("(foo (bar (baz))")), Err(Error));
+    }
 }
