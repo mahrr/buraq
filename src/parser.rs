@@ -14,6 +14,7 @@ pub enum Expr {
     GE(Box<Expr>, Box<Expr>),
     EQ(Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>), // cond, then, else
+    Let(Vec<(String, Expr)>, Box<Expr>), // (vars, vals), body
 }
 
 #[derive(Debug, Clone)]
@@ -119,6 +120,26 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                 let then = Box::new(parse(then)?);
                 let else_ = Box::new(parse(else_)?);
                 Ok(Expr::If(cond, then, else_))
+            }
+
+            // let
+            [SExpr::Symbol(keyword), SExpr::List(bindings), body] if keyword == "let" => {
+                let body = Box::new(parse(body)?);
+                let bindings =
+                    bindings
+                        .iter()
+                        .try_fold(vec![], |mut bindings, sexpr| match sexpr {
+                            SExpr::List(elements) => match &elements[..] {
+                                [SExpr::Symbol(name), value] => {
+                                    bindings.push((name.to_owned(), parse(value)?));
+                                    Ok(bindings)
+                                }
+                                _ => Err(Error),
+                            },
+                            _ => Err(Error),
+                        })?;
+
+                Ok(Expr::Let(bindings, body))
             }
             _ => Err(Error),
         },

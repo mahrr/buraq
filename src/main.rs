@@ -165,6 +165,11 @@ fn compile(expr: parser::Expr) -> String {
 {end_label}:"
             )
         }
+
+        // let
+        Expr::Let(_bindings, _body) => {
+            todo!()
+        }
     }
 }
 
