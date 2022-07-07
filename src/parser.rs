@@ -4,6 +4,7 @@ use std::fmt;
 pub enum Expr {
     Boolean(bool),
     Integer(i64),
+    Identifier(String),
     Add(Box<Expr>, Box<Expr>), // left, right
     Sub(Box<Expr>, Box<Expr>),
     Mul(Box<Expr>, Box<Expr>),
@@ -62,7 +63,7 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
             if symbol == "false" {
                 return Ok(Expr::Boolean(false));
             }
-            Err(Error)
+            Ok(Expr::Identifier(symbol.to_owned()))
         }
         SExpr::List(elements) => match &elements[..] {
             // arithmetics
