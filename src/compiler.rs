@@ -24,14 +24,14 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
 
     match expr {
         // literals
-        Expr::Boolean(true) => String::from("mov rax, 1"),
-        Expr::Boolean(false) => String::from("mov rax, 0"),
-        Expr::Integer(number) => format!("mov rax, {}", number),
+        Expr::Boolean(true) => String::from("    mov rax, 1"),
+        Expr::Boolean(false) => String::from("    mov rax, 0"),
+        Expr::Integer(number) => format!("    mov rax, {}", number),
 
         // identifier
         Expr::Identifier(symbol) => {
             if let Some((_, index)) = env.iter().rev().find(|(name, _)| name == symbol) {
-                format!("mov rax, {}", stack_location(*index))
+                format!("    mov rax, {}", stack_location(*index))
             } else {
                 todo!()
             }
@@ -42,9 +42,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index+1, env);
             format!(
-                "    {left}
+                "{left}
     mov {0}, rax
-    {right}
+{right}
     add rax, {0}",
                 stack_location(stack_index)
             )
@@ -53,9 +53,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index+1, env);
             format!(
-                "    {left}
+                "{left}
     mov {0}, rax
-    {right}
+{right}
     mov rbx, rax
     mov rax, {0}
     sub rax, rbx",
@@ -66,9 +66,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index+1, env);
             format!(
-                "    {left}
+                "{left}
     mov {0}, rax
-    {right}
+{right}
     imul QWORD {0}",
                 stack_location(stack_index)
             )
@@ -77,9 +77,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index+1, env);
             format!(
-                "    {left}
+                "{left}
     mov {0}, rax
-    {right}
+{right}
     mov rbx, rax
     mov rax, {0}
     xor rdx, rdx
@@ -93,9 +93,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index+1, env);
             format!(
-                "    {left}
+                "{left}
     mov {0}, rax
-    {right}
+{right}
     mov rbx, {0}
     cmp rbx, rax
     mov rax, 0
@@ -108,9 +108,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index+1, env);
             format!(
-                "    {left}
+                "{left}
     mov {0}, rax
-    {right}
+{right}
     mov rbx, {0}
     cmp rbx, rax
     mov rax, 0
@@ -123,9 +123,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index+1, env);
             format!(
-                "    {left}
+                "{left}
     mov {0}, rax
-    {right}
+{right}
     mov rbx, {0}
     cmp rbx, rax
     mov rax, 0
@@ -138,9 +138,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index+1, env);
             format!(
-                "    {left}
+                "{left}
     mov {0}, rax
-    {right}
+{right}
     mov rbx, {0}
     cmp rbx, rax
     mov rax, 0
@@ -153,9 +153,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index+1, env);
             format!(
-                "    {left}
+                "{left}
     mov {0}, rax
-    {right}
+{right}
     mov rbx, {0}
     cmp rbx, rax
     mov rax, 0
@@ -173,13 +173,13 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let then = compile_expr!(then);
             let else_ = compile_expr!(else_);
             format!(
-                "    {cond}
+                "{cond}
     cmp rax, 1
     jne near {else_label}
-    {then}
+{then}
     jmp near {end_label}
 {else_label}:
-    {else_}
+{else_}
 {end_label}:"
             )
         }
@@ -203,8 +203,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let body = compile_expr(body, stack_index, env);
             env.truncate(previous_bindings_count);
 
-            format!("; bindings
-{bindings_ins}; body
+            format!(";; bindings
+{bindings_ins};; body
 {body}"
             )
         }
