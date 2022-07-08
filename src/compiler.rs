@@ -29,13 +29,10 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         Expr::Integer(number) => format!("    mov rax, {}", number),
 
         // identifier
-        Expr::Identifier(symbol) => {
-            if let Some((_, index)) = env.iter().rev().find(|(name, _)| name == symbol) {
-                format!("    mov rax, {}", stack_location(*index))
-            } else {
-                todo!()
-            }
-        }
+        Expr::Identifier(name) => match env.iter().rev().find(|(id, _)| name == id) {
+            Some((_, index)) => format!("    mov rax, {}", stack_location(*index)),
+            None => unreachable!() // should be caught at a previous phase,
+        },
 
         // arithmetics
         Expr::Add(left, right) => {

@@ -2,15 +2,21 @@ use crate::parser::Expr;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Error;
+pub enum Error {
+    TypeMismatch,
+    UnboundName(String),
+}
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "type mismatch")
+        match self {
+            Error::TypeMismatch => write!(f, "type mismatch"),
+            Error::UnboundName(name) => write!(f, "unbound name '{name}'"),
+        }
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Type {
     I64,
     Boolean,
@@ -24,7 +30,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
 
             match (left, right) {
                 (Type::I64, Type::I64) => Ok(Type::I64),
-                _ => Err(Error),
+                _ => Err(Error::TypeMismatch),
             }
         }};
     }
@@ -36,7 +42,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
 
             match (left, right) {
                 (Type::I64, Type::I64) => Ok(Type::Boolean),
-                _ => Err(Error),
+                _ => Err(Error::TypeMismatch),
             }
         }};
     }
@@ -46,7 +52,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
         Expr::Integer(_) => Ok(Type::I64),
         Expr::Identifier(name) => match env.iter().rev().find(|(id, _)| name == id) {
             Some((_, type_)) => Ok(*type_),
-            _ => todo!(),
+            _ => Err(Error::UnboundName(name.to_owned())),
         },
         Expr::Add(left, right) => tc_arithmetic!(left, right),
         Expr::Sub(left, right) => tc_arithmetic!(left, right),
@@ -65,7 +71,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
             if cond == Type::Boolean && then == else_ {
                 Ok(then)
             } else {
-                Err(Error)
+                Err(Error::TypeMismatch)
             }
         }
         Expr::Let(bindings, body) => {
