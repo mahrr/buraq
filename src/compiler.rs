@@ -40,7 +40,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         // arithmetics
         Expr::Add(left, right) => {
             let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index+1, env);
+            let right = compile_expr(right, stack_index + 1, env);
             format!(
                 "{left}
     mov {0}, rax
@@ -51,7 +51,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         }
         Expr::Sub(left, right) => {
             let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index+1, env);
+            let right = compile_expr(right, stack_index + 1, env);
             format!(
                 "{left}
     mov {0}, rax
@@ -64,7 +64,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         }
         Expr::Mul(left, right) => {
             let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index+1, env);
+            let right = compile_expr(right, stack_index + 1, env);
             format!(
                 "{left}
     mov {0}, rax
@@ -75,7 +75,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         }
         Expr::Div(left, right) => {
             let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index+1, env);
+            let right = compile_expr(right, stack_index + 1, env);
             format!(
                 "{left}
     mov {0}, rax
@@ -91,7 +91,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         // comparison
         Expr::LT(left, right) => {
             let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index+1, env);
+            let right = compile_expr(right, stack_index + 1, env);
             format!(
                 "{left}
     mov {0}, rax
@@ -106,7 +106,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         }
         Expr::GT(left, right) => {
             let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index+1, env);
+            let right = compile_expr(right, stack_index + 1, env);
             format!(
                 "{left}
     mov {0}, rax
@@ -121,7 +121,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         }
         Expr::LE(left, right) => {
             let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index+1, env);
+            let right = compile_expr(right, stack_index + 1, env);
             format!(
                 "{left}
     mov {0}, rax
@@ -136,7 +136,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         }
         Expr::GE(left, right) => {
             let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index+1, env);
+            let right = compile_expr(right, stack_index + 1, env);
             format!(
                 "{left}
     mov {0}, rax
@@ -151,7 +151,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         }
         Expr::EQ(left, right) => {
             let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index+1, env);
+            let right = compile_expr(right, stack_index + 1, env);
             format!(
                 "{left}
     mov {0}, rax
@@ -203,7 +203,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let body = compile_expr(body, stack_index, env);
             env.truncate(previous_bindings_count);
 
-            format!(";; bindings
+            format!(
+                ";; bindings
 {bindings_ins};; body
 {body}"
             )
