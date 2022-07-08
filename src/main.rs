@@ -7,6 +7,7 @@ use std::{
 mod compiler;
 mod parser;
 mod sexpr;
+mod type_checker;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -42,6 +43,15 @@ fn main() {
             process::exit(1);
         }
     };
+
+    // type check the parse Buraq expression
+    match type_checker::check(&expr) {
+        Ok(_) => (),
+        Err(error) => {
+            eprintln!("error: {error}");
+            process::exit(1);
+        }
+    }
 
     // compile the expression and dump the result to stdout
     println!("{}", compiler::compile(&expr));
