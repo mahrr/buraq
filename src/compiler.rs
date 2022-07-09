@@ -31,7 +31,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         // identifier
         Expr::Identifier(name) => match env.iter().rev().find(|(id, _)| name == id) {
             Some((_, index)) => format!("    mov rax, {}", stack_location(*index)),
-            None => unreachable!() // should be caught at a previous phase,
+            None => unreachable!(), // should be caught at a previous phase,
         },
 
         // arithmetics
@@ -157,7 +157,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             )
         }
 
-        // if
+        // constructs
         Expr::If(cond, then, else_) => {
             let else_label = generate_label("else");
             let end_label = generate_label("if_end");
@@ -175,8 +175,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
 {end_label}:"
             )
         }
-
-        // let
+        Expr::Cond(_, _) => {
+            todo!()
+        }
         Expr::Let(bindings, body) => {
             let previous_bindings_count = env.len();
             let mut bindings_ins = String::new();

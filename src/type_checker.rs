@@ -74,6 +74,9 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
                 Err(Error::TypeMismatch)
             }
         }
+        Expr::Cond(_, _) => {
+            todo!()
+        }
         Expr::Let(bindings, body) => {
             let prev_bindings_count = env.len();
 

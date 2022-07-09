@@ -15,6 +15,7 @@ pub enum Expr {
     GE(Box<Expr>, Box<Expr>),
     EQ(Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>), // cond, then, else
+    Cond(Vec<(Expr, Expr)>, Box<Expr>),  // variants, else
     Let(Vec<(String, Expr)>, Box<Expr>), // (vars, vals), body
 }
 
@@ -115,15 +116,37 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                 Ok(Expr::EQ(left, right))
             }
 
-            // if
+            // constructs
             [SExpr::Symbol(keyword), cond, then, else_] if keyword == "if" => {
                 let cond = Box::new(parse(cond)?);
                 let then = Box::new(parse(then)?);
                 let else_ = Box::new(parse(else_)?);
                 Ok(Expr::If(cond, then, else_))
             }
+            [SExpr::Symbol(keyword), clauses @ .., SExpr::List(last_clause)]
+                if keyword == "cond" =>
+            {
+                let last_clause = match &last_clause[..] {
+                    [SExpr::Symbol(keyword), variant] if keyword == "else" => parse(variant),
+                    _ => Err(Error),
+                }?;
 
-            // let
+                let clauses =
+                    clauses
+                        .iter()
+                        .try_fold(vec![], |mut clauses, sexpr| match sexpr {
+                            SExpr::List(pair) => match &pair[..] {
+                                [test, form] => {
+                                    clauses.push((parse(test)?, parse(form)?));
+                                    Ok(clauses)
+                                }
+                                _ => Err(Error),
+                            },
+                            _ => Err(Error),
+                        })?;
+
+                Ok(Expr::Cond(clauses, Box::new(last_clause)))
+            }
             [SExpr::Symbol(keyword), SExpr::List(bindings), body] if keyword == "let" => {
                 let body = Box::new(parse(body)?);
                 let bindings =
