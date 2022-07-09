@@ -175,8 +175,25 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
 {end_label}:"
             )
         }
-        Expr::Cond(_, _) => {
-            todo!()
+        Expr::Cond(clauses, last_clause) => {
+            let cond_end_label = generate_label("cond_end");
+            let last_clause = compile_expr!(last_clause);
+            let clauses = clauses.iter().fold(String::new(), |clauses, (test, form)| {
+                let clause_end_label = generate_label("clause_end");
+                let test = compile_expr!(test);
+                let form = compile_expr!(form);
+
+                format!(
+                    "{clauses}
+{test}
+    cmp rax, 1
+    jne near {clause_end_label}
+{form}
+    jmp near {cond_end_label}
+{clause_end_label}:"
+                )
+            });
+            format!("{clauses}\n{last_clause}\n{cond_end_label}:")
         }
         Expr::Let(bindings, body) => {
             let previous_bindings_count = env.len();
@@ -196,11 +213,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             let body = compile_expr(body, stack_index, env);
             env.truncate(previous_bindings_count);
 
-            format!(
-                ";; bindings
-{bindings_ins};; body
-{body}"
-            )
+            format!("{bindings_ins}{body}")
         }
     }
 }

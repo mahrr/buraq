@@ -74,8 +74,19 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
                 Err(Error::TypeMismatch)
             }
         }
-        Expr::Cond(_, _) => {
-            todo!()
+        Expr::Cond(clauses, last_clause) => {
+            let last_clause = check_impl(last_clause, env)?;
+
+            clauses.iter().try_fold(last_clause, |type_, (test, form)| {
+                let test = check_impl(test, env)?;
+                let form = check_impl(form, env)?;
+
+                if test == Type::Boolean && form == type_ {
+                    Ok(type_)
+                } else {
+                    Err(Error::TypeMismatch)
+                }
+            })
         }
         Expr::Let(bindings, body) => {
             let prev_bindings_count = env.len();
