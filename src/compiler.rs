@@ -95,9 +95,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
 {right}
     mov rbx, {0}
     cmp rbx, rax
-    mov rax, 0
-    mov rbx, 1
-    cmovl rax, rbx",
+    setl al
+    movzx eax, al",
                 stack_location(stack_index)
             )
         }
@@ -110,9 +109,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
 {right}
     mov rbx, {0}
     cmp rbx, rax
-    mov rax, 0
-    mov rbx, 1
-    cmovg rax, rbx",
+    setg al
+    movzx eax, al",
                 stack_location(stack_index)
             )
         }
@@ -125,9 +123,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
 {right}
     mov rbx, {0}
     cmp rbx, rax
-    mov rax, 0
-    mov rbx, 1
-    cmovle rax, rbx",
+    setle al
+    movzx eax, al",
                 stack_location(stack_index)
             )
         }
@@ -140,9 +137,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
 {right}
     mov rbx, {0}
     cmp rbx, rax
-    mov rax, 0
-    mov rbx, 1
-    cmovge rax, rbx",
+    setg al
+    movzx eax, al",
                 stack_location(stack_index)
             )
         }
@@ -155,9 +151,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
 {right}
     mov rbx, {0}
     cmp rbx, rax
-    mov rax, 0
-    mov rbx, 1
-    cmove rax, rbx",
+    sete al
+    movzx eax, al",
                 stack_location(stack_index)
             )
         }
