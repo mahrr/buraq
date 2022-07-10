@@ -17,6 +17,7 @@ pub enum Expr {
     If(Box<Expr>, Box<Expr>, Box<Expr>), // cond, then, else
     Cond(Vec<(Expr, Expr)>, Box<Expr>),  // variants, else
     Let(Vec<(String, Expr)>, Box<Expr>), // (vars, vals), body
+    Set(String, Box<Expr>),              // var, val
     Seq(Box<Expr>, Vec<Expr>),           // first, ..rest
 }
 
@@ -165,6 +166,9 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                         })?;
 
                 Ok(Expr::Let(bindings, body))
+            }
+            [Symbol(keyword), Symbol(name), value] if keyword == "set" => {
+                Ok(Expr::Set(name.to_owned(), Box::new(parse(value)?)))
             }
             [Symbol(keyword), first, rest @ ..] if keyword == "seq" => {
                 let first = Box::new(parse(first)?);

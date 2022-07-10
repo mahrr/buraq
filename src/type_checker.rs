@@ -22,6 +22,13 @@ pub enum Type {
     Boolean,
 }
 
+fn name_type(name: &String, env: &Vec<(String, Type)>) -> Result<Type, Error> {
+    match env.iter().rev().find(|(id, _)| name == id) {
+        Some((_, type_)) => Ok(*type_),
+        _ => Err(Error::UnboundName(name.to_owned())),
+    }
+}
+
 fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error> {
     macro_rules! tc_arithmetic {
         ($left:expr, $right:expr) => {{
@@ -50,10 +57,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
     match expr {
         Expr::Boolean(_) => Ok(Type::Boolean),
         Expr::Integer(_) => Ok(Type::I64),
-        Expr::Identifier(name) => match env.iter().rev().find(|(id, _)| name == id) {
-            Some((_, type_)) => Ok(*type_),
-            _ => Err(Error::UnboundName(name.to_owned())),
-        },
+        Expr::Identifier(name) => name_type(name, env),
         Expr::Add(left, right) => tc_arithmetic!(left, right),
         Expr::Sub(left, right) => tc_arithmetic!(left, right),
         Expr::Mul(left, right) => tc_arithmetic!(left, right),
@@ -101,6 +105,15 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
             let body = check_impl(body, env);
             env.truncate(prev_bindings_count);
             body
+        }
+        Expr::Set(name, value) => {
+            let name = name_type(name, env)?;
+            let value = check_impl(value, env)?;
+            if name == value {
+                Ok(name)
+            } else {
+                Err(Error::TypeMismatch)
+            }
         }
         Expr::Seq(first, rest) => rest
             .iter()

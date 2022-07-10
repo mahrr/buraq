@@ -15,6 +15,13 @@ fn stack_location(index: u32) -> String {
     format!("[rsp - {index}]")
 }
 
+fn name_stack_index(name: &String, env: &Vec<(String, u32)>) -> u32 {
+    match env.iter().rev().find(|(id, _)| name == id) {
+        Some((_, index)) => *index,
+        None => unreachable!(), // should be caught at a previous phase,
+    }
+}
+
 fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> String {
     macro_rules! compile_expr {
         ($e:expr) => {
@@ -29,10 +36,10 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         Expr::Integer(number) => format!("    mov rax, {}", number),
 
         // identifier
-        Expr::Identifier(name) => match env.iter().rev().find(|(id, _)| name == id) {
-            Some((_, index)) => format!("    mov rax, {}", stack_location(*index)),
-            None => unreachable!(), // should be caught at a previous phase,
-        },
+        Expr::Identifier(name) => format!(
+            "    mov rax, {}",
+            stack_location(name_stack_index(name, env))
+        ),
 
         // arithmetics
         Expr::Add(left, right) => {
@@ -214,6 +221,11 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             env.truncate(previous_bindings_count);
 
             format!("{bindings_ins}{body}")
+        }
+        Expr::Set(name, value) => {
+            let value = compile_expr!(value);
+            let index = name_stack_index(name, env);
+            format!("{value}\n    mov {}, rax", stack_location(index))
         }
         Expr::Seq(first, rest) => rest.iter().fold(compile_expr!(first), |output, expr| {
             format!("{output}\n{}", compile_expr!(expr))

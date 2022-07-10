@@ -1,7 +1,11 @@
 (let
     (
         (x 1)
-        (y 2)
+        (y 1)
     )
-    (seq x (+ x y) (< x y))
+    (seq
+        (set x (+ x 1))
+        (set y (- y 1))
+        (+ x y)
+    )
 )
