@@ -202,6 +202,22 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
             });
             format!("{clauses}\n{last_clause}\n{cond_end_label}:")
         }
+        Expr::While(cond, body) => {
+            let start_label = generate_label("while_start");
+            let exit_label = generate_label("while_exit");
+            let cond = compile_expr!(cond);
+            let body = compile_expr!(body);
+            format!(
+                "{start_label}:
+{cond}
+    cmp rax, 1
+    jne near {exit_label}
+{body}
+    jmp near {start_label}
+{exit_label}:
+"
+            )
+        }
         Expr::Let(bindings, body) => {
             let previous_bindings_count = env.len();
             let mut bindings_ins = String::new();

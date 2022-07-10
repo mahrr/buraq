@@ -16,6 +16,7 @@ pub enum Expr {
     EQ(Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>), // cond, then, else
     Cond(Vec<(Expr, Expr)>, Box<Expr>),  // variants, else
+    While(Box<Expr>, Box<Expr>),         // cond, body
     Let(Vec<(String, Expr)>, Box<Expr>), // (vars, vals), body
     Set(String, Box<Expr>),              // var, val
     Seq(Box<Expr>, Vec<Expr>),           // first, ..rest
@@ -148,6 +149,11 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                         })?;
 
                 Ok(Expr::Cond(clauses, Box::new(last_clause)))
+            }
+            [Symbol(keyword), cond, body] if keyword == "while" => {
+                let cond = Box::new(parse(cond)?);
+                let body = Box::new(parse(body)?);
+                Ok(Expr::While(cond, body))
             }
             [Symbol(keyword), List(bindings), body] if keyword == "let" => {
                 let body = Box::new(parse(body)?);
