@@ -54,8 +54,10 @@ fn parse_integer(source: &String) -> Option<i64> {
 }
 
 pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
+    use SExpr::*;
+
     match sexpr {
-        SExpr::Symbol(symbol) => {
+        Symbol(symbol) => {
             if let Some(number) = parse_integer(&symbol) {
                 return Ok(Expr::Integer(number));
             }
@@ -67,68 +69,66 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
             }
             Ok(Expr::Identifier(symbol.to_owned()))
         }
-        SExpr::List(elements) => match &elements[..] {
+        List(elements) => match &elements[..] {
             // arithmetics
-            [SExpr::Symbol(op), left, right] if op == "+" => {
+            [Symbol(op), left, right] if op == "+" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::Add(left, right))
             }
-            [SExpr::Symbol(op), left, right] if op == "-" => {
+            [Symbol(op), left, right] if op == "-" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::Sub(left, right))
             }
-            [SExpr::Symbol(op), left, right] if op == "*" => {
+            [Symbol(op), left, right] if op == "*" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::Mul(left, right))
             }
-            [SExpr::Symbol(op), left, right] if op == "/" => {
+            [Symbol(op), left, right] if op == "/" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::Div(left, right))
             }
 
             // comparison
-            [SExpr::Symbol(op), left, right] if op == "<" => {
+            [Symbol(op), left, right] if op == "<" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::LT(left, right))
             }
-            [SExpr::Symbol(op), left, right] if op == ">" => {
+            [Symbol(op), left, right] if op == ">" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::GT(left, right))
             }
-            [SExpr::Symbol(op), left, right] if op == "<=" => {
+            [Symbol(op), left, right] if op == "<=" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::LE(left, right))
             }
-            [SExpr::Symbol(op), left, right] if op == ">=" => {
+            [Symbol(op), left, right] if op == ">=" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::GE(left, right))
             }
-            [SExpr::Symbol(op), left, right] if op == "=" => {
+            [Symbol(op), left, right] if op == "=" => {
                 let left = Box::new(parse(left)?);
                 let right = Box::new(parse(right)?);
                 Ok(Expr::EQ(left, right))
             }
 
             // constructs
-            [SExpr::Symbol(keyword), cond, then, else_] if keyword == "if" => {
+            [Symbol(keyword), cond, then, else_] if keyword == "if" => {
                 let cond = Box::new(parse(cond)?);
                 let then = Box::new(parse(then)?);
                 let else_ = Box::new(parse(else_)?);
                 Ok(Expr::If(cond, then, else_))
             }
-            [SExpr::Symbol(keyword), clauses @ .., SExpr::List(last_clause)]
-                if keyword == "cond" =>
-            {
+            [Symbol(keyword), clauses @ .., List(last_clause)] if keyword == "cond" => {
                 let last_clause = match &last_clause[..] {
-                    [SExpr::Symbol(keyword), variant] if keyword == "else" => parse(variant),
+                    [Symbol(keyword), form] if keyword == "else" => parse(form),
                     _ => Err(Error),
                 }?;
 
@@ -136,7 +136,7 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                     clauses
                         .iter()
                         .try_fold(vec![], |mut clauses, sexpr| match sexpr {
-                            SExpr::List(pair) => match &pair[..] {
+                            List(pair) => match &pair[..] {
                                 [test, form] => {
                                     clauses.push((parse(test)?, parse(form)?));
                                     Ok(clauses)
@@ -148,14 +148,14 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
 
                 Ok(Expr::Cond(clauses, Box::new(last_clause)))
             }
-            [SExpr::Symbol(keyword), SExpr::List(bindings), body] if keyword == "let" => {
+            [Symbol(keyword), List(bindings), body] if keyword == "let" => {
                 let body = Box::new(parse(body)?);
                 let bindings =
                     bindings
                         .iter()
                         .try_fold(vec![], |mut bindings, sexpr| match sexpr {
-                            SExpr::List(elements) => match &elements[..] {
-                                [SExpr::Symbol(name), value] => {
+                            List(elements) => match &elements[..] {
+                                [Symbol(name), value] => {
                                     bindings.push((name.to_owned(), parse(value)?));
                                     Ok(bindings)
                                 }
@@ -166,7 +166,7 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
 
                 Ok(Expr::Let(bindings, body))
             }
-            [SExpr::Symbol(keyword), first, rest @ ..] if keyword == "seq" => {
+            [Symbol(keyword), first, rest @ ..] if keyword == "seq" => {
                 let first = Box::new(parse(first)?);
                 let rest = rest.iter().try_fold(vec![], |mut rest, sexpr| {
                     rest.push(parse(sexpr)?);
