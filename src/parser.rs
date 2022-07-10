@@ -17,6 +17,7 @@ pub enum Expr {
     If(Box<Expr>, Box<Expr>, Box<Expr>), // cond, then, else
     Cond(Vec<(Expr, Expr)>, Box<Expr>),  // variants, else
     Let(Vec<(String, Expr)>, Box<Expr>), // (vars, vals), body
+    Seq(Box<Expr>, Vec<Expr>),           // first, ..rest
 }
 
 #[derive(Debug, Clone)]
@@ -164,6 +165,14 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                         })?;
 
                 Ok(Expr::Let(bindings, body))
+            }
+            [SExpr::Symbol(keyword), first, rest @ ..] if keyword == "seq" => {
+                let first = Box::new(parse(first)?);
+                let rest = rest.iter().try_fold(vec![], |mut rest, sexpr| {
+                    rest.push(parse(sexpr)?);
+                    Ok(rest)
+                })?;
+                Ok(Expr::Seq(first, rest))
             }
             _ => Err(Error),
         },

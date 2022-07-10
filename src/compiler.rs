@@ -215,6 +215,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
 
             format!("{bindings_ins}{body}")
         }
+        Expr::Seq(first, rest) => rest.iter().fold(compile_expr!(first), |output, expr| {
+            format!("{output}\n{}", compile_expr!(expr))
+        }),
     }
 }
 
