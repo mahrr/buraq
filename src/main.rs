@@ -36,7 +36,7 @@ fn main() {
     };
 
     // parse the S-Expression into a Buraq expression
-    let expr = match parser::parse(&sexpr) {
+    let expr = match parser::parse_expr(&sexpr) {
         Ok(expr) => expr,
         Err(error) => {
             eprintln!("error: {error}");

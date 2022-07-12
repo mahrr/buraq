@@ -26,6 +26,11 @@ pub enum Def {
     Fn(String, Vec<String>, Expr),
 }
 
+pub struct Prog {
+    definitions: Vec<Def>,
+    expression: Expr,
+}
+
 #[derive(Debug, Clone)]
 pub enum Error {
     InvalidExpr,
@@ -65,7 +70,7 @@ fn parse_integer(source: &String) -> Option<i64> {
     return Some(result);
 }
 
-pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
+pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
     use SExpr::*;
 
     match sexpr {
@@ -84,63 +89,63 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
         List(elements) => match &elements[..] {
             // arithmetics
             [Symbol(op), left, right] if op == "+" => {
-                let left = Box::new(parse(left)?);
-                let right = Box::new(parse(right)?);
+                let left = Box::new(parse_expr(left)?);
+                let right = Box::new(parse_expr(right)?);
                 Ok(Expr::Add(left, right))
             }
             [Symbol(op), left, right] if op == "-" => {
-                let left = Box::new(parse(left)?);
-                let right = Box::new(parse(right)?);
+                let left = Box::new(parse_expr(left)?);
+                let right = Box::new(parse_expr(right)?);
                 Ok(Expr::Sub(left, right))
             }
             [Symbol(op), left, right] if op == "*" => {
-                let left = Box::new(parse(left)?);
-                let right = Box::new(parse(right)?);
+                let left = Box::new(parse_expr(left)?);
+                let right = Box::new(parse_expr(right)?);
                 Ok(Expr::Mul(left, right))
             }
             [Symbol(op), left, right] if op == "/" => {
-                let left = Box::new(parse(left)?);
-                let right = Box::new(parse(right)?);
+                let left = Box::new(parse_expr(left)?);
+                let right = Box::new(parse_expr(right)?);
                 Ok(Expr::Div(left, right))
             }
 
             // comparison
             [Symbol(op), left, right] if op == "<" => {
-                let left = Box::new(parse(left)?);
-                let right = Box::new(parse(right)?);
+                let left = Box::new(parse_expr(left)?);
+                let right = Box::new(parse_expr(right)?);
                 Ok(Expr::LT(left, right))
             }
             [Symbol(op), left, right] if op == ">" => {
-                let left = Box::new(parse(left)?);
-                let right = Box::new(parse(right)?);
+                let left = Box::new(parse_expr(left)?);
+                let right = Box::new(parse_expr(right)?);
                 Ok(Expr::GT(left, right))
             }
             [Symbol(op), left, right] if op == "<=" => {
-                let left = Box::new(parse(left)?);
-                let right = Box::new(parse(right)?);
+                let left = Box::new(parse_expr(left)?);
+                let right = Box::new(parse_expr(right)?);
                 Ok(Expr::LE(left, right))
             }
             [Symbol(op), left, right] if op == ">=" => {
-                let left = Box::new(parse(left)?);
-                let right = Box::new(parse(right)?);
+                let left = Box::new(parse_expr(left)?);
+                let right = Box::new(parse_expr(right)?);
                 Ok(Expr::GE(left, right))
             }
             [Symbol(op), left, right] if op == "=" => {
-                let left = Box::new(parse(left)?);
-                let right = Box::new(parse(right)?);
+                let left = Box::new(parse_expr(left)?);
+                let right = Box::new(parse_expr(right)?);
                 Ok(Expr::EQ(left, right))
             }
 
             // constructs
             [Symbol(keyword), cond, then, else_] if keyword == "if" => {
-                let cond = Box::new(parse(cond)?);
-                let then = Box::new(parse(then)?);
-                let else_ = Box::new(parse(else_)?);
+                let cond = Box::new(parse_expr(cond)?);
+                let then = Box::new(parse_expr(then)?);
+                let else_ = Box::new(parse_expr(else_)?);
                 Ok(Expr::If(cond, then, else_))
             }
             [Symbol(keyword), clauses @ .., List(last_clause)] if keyword == "cond" => {
                 let last_clause = match &last_clause[..] {
-                    [Symbol(keyword), form] if keyword == "else" => parse(form),
+                    [Symbol(keyword), form] if keyword == "else" => parse_expr(form),
                     _ => Err(Error::InvalidExpr),
                 }?;
 
@@ -150,7 +155,7 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                         .try_fold(vec![], |mut clauses, sexpr| match sexpr {
                             List(pair) => match &pair[..] {
                                 [test, form] => {
-                                    clauses.push((parse(test)?, parse(form)?));
+                                    clauses.push((parse_expr(test)?, parse_expr(form)?));
                                     Ok(clauses)
                                 }
                                 _ => Err(Error::InvalidExpr),
@@ -161,19 +166,19 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                 Ok(Expr::Cond(clauses, Box::new(last_clause)))
             }
             [Symbol(keyword), cond, body] if keyword == "while" => {
-                let cond = Box::new(parse(cond)?);
-                let body = Box::new(parse(body)?);
+                let cond = Box::new(parse_expr(cond)?);
+                let body = Box::new(parse_expr(body)?);
                 Ok(Expr::While(cond, body))
             }
             [Symbol(keyword), List(bindings), body] if keyword == "let" => {
-                let body = Box::new(parse(body)?);
+                let body = Box::new(parse_expr(body)?);
                 let bindings =
                     bindings
                         .iter()
                         .try_fold(vec![], |mut bindings, sexpr| match sexpr {
                             List(elements) => match &elements[..] {
                                 [Symbol(name), value] => {
-                                    bindings.push((name.to_owned(), parse(value)?));
+                                    bindings.push((name.to_owned(), parse_expr(value)?));
                                     Ok(bindings)
                                 }
                                 _ => Err(Error::InvalidExpr),
@@ -184,12 +189,12 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                 Ok(Expr::Let(bindings, body))
             }
             [Symbol(keyword), Symbol(name), value] if keyword == "set" => {
-                Ok(Expr::Set(name.to_owned(), Box::new(parse(value)?)))
+                Ok(Expr::Set(name.to_owned(), Box::new(parse_expr(value)?)))
             }
             [Symbol(keyword), first, rest @ ..] if keyword == "seq" => {
-                let first = Box::new(parse(first)?);
+                let first = Box::new(parse_expr(first)?);
                 let rest = rest.iter().try_fold(vec![], |mut rest, sexpr| {
-                    rest.push(parse(sexpr)?);
+                    rest.push(parse_expr(sexpr)?);
                     Ok(rest)
                 })?;
                 Ok(Expr::Seq(first, rest))
@@ -205,7 +210,7 @@ pub fn parse_def(sexpr: &SExpr) -> Result<Def, Error> {
     match sexpr {
         List(elements) => match &elements[..] {
             [Symbol(keyword), Symbol(name), List(parameters), body] if keyword == "defn" => {
-                let body = parse(body)?;
+                let body = parse_expr(body)?;
                 let parameters = parameters
                     .iter()
                     .try_fold(vec![], |mut parameters, sexpr| match sexpr {
@@ -221,4 +226,25 @@ pub fn parse_def(sexpr: &SExpr) -> Result<Def, Error> {
         },
         Symbol(_) => Err(Error::InvalidDef),
     }
+}
+
+pub fn parse_prog(sexprs: &Vec<SExpr>) -> Result<Prog, Error> {
+    let mut definitions = vec![];
+    let expression: Expr;
+
+    match &sexprs[..] {
+        [sexpr] => expression = parse_expr(sexpr)?,
+        [defs @ .., sexpr] => {
+            for def in defs {
+                definitions.push(parse_def(def)?);
+            }
+            expression = parse_expr(sexpr)?;
+        }
+        _ => unreachable!(),
+    }
+
+    Ok(Prog {
+        expression: expression,
+        definitions: definitions,
+    })
 }

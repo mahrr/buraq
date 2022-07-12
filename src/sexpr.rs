@@ -69,7 +69,7 @@ pub fn parse_multiple(source: &String) -> Result<Vec<SExpr>, Error> {
     loop {
         match parse_impl(&mut it) {
             Ok(sexpr) => sexprs.push(sexpr),
-            Err(error) => return Err(error)
+            Err(error) => return Err(error),
         }
 
         if it.peek() == None {
@@ -153,7 +153,10 @@ mod tests {
             parse_multiple(&sexprs),
             Ok(vec![
                 SExpr::List(vec![SExpr::Symbol("1".to_string())]),
-                SExpr::List(vec![SExpr::Symbol("2".to_string()), SExpr::Symbol("3".to_string())]),
+                SExpr::List(vec![
+                    SExpr::Symbol("2".to_string()),
+                    SExpr::Symbol("3".to_string())
+                ]),
                 SExpr::Symbol("4".to_string())
             ])
         );
@@ -166,6 +169,9 @@ mod tests {
         assert_eq!(parse_multiple(&String::from("")), Err(Error));
         assert_eq!(parse_multiple(&String::from("(foo bar")), Err(Error));
         assert_eq!(parse_multiple(&String::from(")foo bar)")), Err(Error));
-        assert_eq!(parse_multiple(&String::from("(foo (bar (baz))")), Err(Error));
+        assert_eq!(
+            parse_multiple(&String::from("(foo (bar (baz))")),
+            Err(Error)
+        );
     }
 }
