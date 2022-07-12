@@ -22,12 +22,22 @@ pub enum Expr {
     Seq(Box<Expr>, Vec<Expr>),           // first, ..rest
 }
 
+pub enum Def {
+    Fn(String, Vec<String>, Expr),
+}
+
 #[derive(Debug, Clone)]
-pub struct Error;
+pub enum Error {
+    InvalidExpr,
+    InvalidDef,
+}
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "invalid expression")
+        match self {
+            Error::InvalidExpr => write!(f, "invalid expression"),
+            Error::InvalidDef => write!(f, "invalid definition"),
+        }
     }
 }
 
@@ -131,7 +141,7 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
             [Symbol(keyword), clauses @ .., List(last_clause)] if keyword == "cond" => {
                 let last_clause = match &last_clause[..] {
                     [Symbol(keyword), form] if keyword == "else" => parse(form),
-                    _ => Err(Error),
+                    _ => Err(Error::InvalidExpr),
                 }?;
 
                 let clauses =
@@ -143,9 +153,9 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                                     clauses.push((parse(test)?, parse(form)?));
                                     Ok(clauses)
                                 }
-                                _ => Err(Error),
+                                _ => Err(Error::InvalidExpr),
                             },
-                            _ => Err(Error),
+                            _ => Err(Error::InvalidExpr),
                         })?;
 
                 Ok(Expr::Cond(clauses, Box::new(last_clause)))
@@ -166,9 +176,9 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                                     bindings.push((name.to_owned(), parse(value)?));
                                     Ok(bindings)
                                 }
-                                _ => Err(Error),
+                                _ => Err(Error::InvalidExpr),
                             },
-                            _ => Err(Error),
+                            _ => Err(Error::InvalidExpr),
                         })?;
 
                 Ok(Expr::Let(bindings, body))
@@ -184,7 +194,31 @@ pub fn parse(sexpr: &SExpr) -> Result<Expr, Error> {
                 })?;
                 Ok(Expr::Seq(first, rest))
             }
-            _ => Err(Error),
+            _ => Err(Error::InvalidExpr),
         },
+    }
+}
+
+pub fn parse_def(sexpr: &SExpr) -> Result<Def, Error> {
+    use SExpr::*;
+
+    match sexpr {
+        List(elements) => match &elements[..] {
+            [Symbol(keyword), Symbol(name), List(parameters), body] if keyword == "defn" => {
+                let body = parse(body)?;
+                let parameters = parameters
+                    .iter()
+                    .try_fold(vec![], |mut parameters, sexpr| match sexpr {
+                        Symbol(parameter) => {
+                            parameters.push(parameter.to_owned());
+                            Ok(parameters)
+                        }
+                        List(_) => Err(Error::InvalidDef),
+                    })?;
+                Ok(Def::Fn(name.to_owned(), parameters, body))
+            }
+            _ => Err(Error::InvalidDef),
+        },
+        Symbol(_) => Err(Error::InvalidDef),
     }
 }
