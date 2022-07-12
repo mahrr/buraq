@@ -62,6 +62,24 @@ pub fn parse(source: &String) -> Result<SExpr, Error> {
     parse_impl(&mut source.chars().peekable())
 }
 
+pub fn parse_multiple(source: &String) -> Result<Vec<SExpr>, Error> {
+    let mut it = source.chars().peekable();
+    let mut sexprs = vec![];
+
+    loop {
+        match parse_impl(&mut it) {
+            Ok(sexpr) => sexprs.push(sexpr),
+            Err(error) => return Err(error)
+        }
+
+        if it.peek() == None {
+            break;
+        }
+    }
+
+    Ok(sexprs)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,10 +138,34 @@ mod tests {
             ]))
         );
 
+        let sexprs = String::from("1 2 3");
+        assert_eq!(
+            parse_multiple(&sexprs),
+            Ok(vec![
+                SExpr::Symbol("1".to_string()),
+                SExpr::Symbol("2".to_string()),
+                SExpr::Symbol("3".to_string())
+            ])
+        );
+
+        let sexprs = String::from("(1) (2 3) 4");
+        assert_eq!(
+            parse_multiple(&sexprs),
+            Ok(vec![
+                SExpr::List(vec![SExpr::Symbol("1".to_string())]),
+                SExpr::List(vec![SExpr::Symbol("2".to_string()), SExpr::Symbol("3".to_string())]),
+                SExpr::Symbol("4".to_string())
+            ])
+        );
+
         // invalid S-Expressions
         assert_eq!(parse(&String::from("")), Err(Error));
         assert_eq!(parse(&String::from(")foo bar)")), Err(Error));
         assert_eq!(parse(&String::from("(foo bar")), Err(Error));
         assert_eq!(parse(&String::from("(foo (bar (baz))")), Err(Error));
+        assert_eq!(parse_multiple(&String::from("")), Err(Error));
+        assert_eq!(parse_multiple(&String::from("(foo bar")), Err(Error));
+        assert_eq!(parse_multiple(&String::from(")foo bar)")), Err(Error));
+        assert_eq!(parse_multiple(&String::from("(foo (bar (baz))")), Err(Error));
     }
 }
