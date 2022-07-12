@@ -1,4 +1,5 @@
 use crate::sexpr::SExpr;
+use crate::type_checker::Type;
 use std::fmt;
 
 pub enum Expr {
@@ -23,7 +24,7 @@ pub enum Expr {
 }
 
 pub enum Def {
-    Fn(String, Vec<String>, Expr),
+    Fn(String, Vec<(String, Type)>, Expr),
 }
 
 pub struct Prog {
@@ -35,6 +36,7 @@ pub struct Prog {
 pub enum Error {
     InvalidExpr,
     InvalidDef,
+    InvalidType,
 }
 
 impl fmt::Display for Error {
@@ -42,6 +44,7 @@ impl fmt::Display for Error {
         match self {
             Error::InvalidExpr => write!(f, "invalid expression"),
             Error::InvalidDef => write!(f, "invalid definition"),
+            Error::InvalidType => write!(f, "invalid type annotation"),
         }
     }
 }
@@ -68,6 +71,14 @@ fn parse_integer(source: &String) -> Option<i64> {
     }
 
     return Some(result);
+}
+
+fn parse_type(sexpr: &SExpr) -> Result<Type, Error> {
+    match sexpr {
+        SExpr::Symbol(keyword) if keyword == "i64" => Ok(Type::I64),
+        SExpr::Symbol(keyword) if keyword == "bool" => Ok(Type::Boolean),
+        _ => Err(Error::InvalidType),
+    }
 }
 
 pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
@@ -214,11 +225,14 @@ pub fn parse_def(sexpr: &SExpr) -> Result<Def, Error> {
                 let parameters = parameters
                     .iter()
                     .try_fold(vec![], |mut parameters, sexpr| match sexpr {
-                        Symbol(parameter) => {
-                            parameters.push(parameter.to_owned());
-                            Ok(parameters)
-                        }
-                        List(_) => Err(Error::InvalidDef),
+                        List(elements) => match &elements[..] {
+                            [SExpr::Symbol(name), type_] => {
+                                parameters.push((name.to_owned(), parse_type(type_)?));
+                                Ok(parameters)
+                            }
+                            _ => Err(Error::InvalidDef),
+                        },
+                        Symbol(_) => Err(Error::InvalidDef),
                     })?;
                 Ok(Def::Fn(name.to_owned(), parameters, body))
             }
