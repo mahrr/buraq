@@ -45,7 +45,7 @@ fn main() {
     };
 
     // type check the parse Buraq expression
-    match type_checker::check(&expr) {
+    match type_checker::check_expr(&expr) {
         Ok(_) => (),
         Err(error) => {
             eprintln!("error: {error}");

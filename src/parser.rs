@@ -21,15 +21,16 @@ pub enum Expr {
     Let(Vec<(String, Expr)>, Box<Expr>), // (vars, vals), body
     Set(String, Box<Expr>),              // var, val
     Seq(Box<Expr>, Vec<Expr>),           // first, ..rest
+    App(Box<Expr>, Vec<Expr>),           // function, arguments
 }
 
 pub enum Def {
-    Fn(String, Vec<(String, Type)>, Expr),
+    Fn(String, Vec<(String, Type)>, Type, Expr), // name, parameters, return_type, body
 }
 
 pub struct Prog {
-    definitions: Vec<Def>,
-    expression: Expr,
+    pub definitions: Vec<Def>,
+    pub expression: Expr,
 }
 
 #[derive(Debug, Clone)]
@@ -210,6 +211,14 @@ pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
                 })?;
                 Ok(Expr::Seq(first, rest))
             }
+            [function, arguments @ ..] => {
+                let function = Box::new(parse_expr(function)?);
+                let arguments = arguments.iter().try_fold(vec![], |mut arguments, sexpr| {
+                    arguments.push(parse_expr(sexpr)?);
+                    Ok(arguments)
+                })?;
+                Ok(Expr::App(function, arguments))
+            }
             _ => Err(Error::InvalidExpr),
         },
     }
@@ -220,7 +229,10 @@ pub fn parse_def(sexpr: &SExpr) -> Result<Def, Error> {
 
     match sexpr {
         List(elements) => match &elements[..] {
-            [Symbol(keyword), Symbol(name), List(parameters), body] if keyword == "defn" => {
+            [Symbol(keyword), Symbol(name), List(parameters), return_type, body]
+                if keyword == "defn" =>
+            {
+                let return_type = parse_type(return_type)?;
                 let body = parse_expr(body)?;
                 let parameters = parameters
                     .iter()
@@ -234,7 +246,7 @@ pub fn parse_def(sexpr: &SExpr) -> Result<Def, Error> {
                         },
                         Symbol(_) => Err(Error::InvalidDef),
                     })?;
-                Ok(Def::Fn(name.to_owned(), parameters, body))
+                Ok(Def::Fn(name.to_owned(), parameters, return_type, body))
             }
             _ => Err(Error::InvalidDef),
         },

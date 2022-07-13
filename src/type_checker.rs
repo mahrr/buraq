@@ -1,4 +1,4 @@
-use crate::parser::Expr;
+use crate::parser::{Def, Expr, Prog};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -16,15 +16,16 @@ impl fmt::Display for Error {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     I64,
     Boolean,
+    Fn(Vec<Type>, Box<Type>),
 }
 
 fn name_type(name: &String, env: &Vec<(String, Type)>) -> Result<Type, Error> {
     match env.iter().rev().find(|(id, _)| name == id) {
-        Some((_, type_)) => Ok(*type_),
+        Some((_, type_)) => Ok(type_.to_owned()),
         _ => Err(Error::UnboundName(name.to_owned())),
     }
 }
@@ -125,10 +126,40 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
         Expr::Seq(first, rest) => rest
             .iter()
             .try_fold(check_impl(first, env)?, |_, expr| check_impl(expr, env)),
+        Expr::App(_function, _arguments) => {
+            todo!()
+        }
     }
 }
 
-pub fn check(expr: &Expr) -> Result<Type, Error> {
+pub fn check_expr(expr: &Expr) -> Result<Type, Error> {
     let mut env = vec![];
     check_impl(expr, &mut env)
+}
+
+pub fn check_prog(prog: &Prog) -> Result<Type, Error> {
+    // build the initial type environment from the given definitions
+    let mut env = prog
+        .definitions
+        .iter()
+        .map(|def| match def {
+            Def::Fn(name, parameters, return_type, _) => {
+                let parameters: Vec<Type> = parameters.iter().map(|p| p.1.to_owned()).collect();
+                (
+                    name.to_owned(),
+                    Type::Fn(parameters, Box::new(return_type.to_owned())),
+                )
+            }
+        })
+        .collect();
+
+    // type check the definitions
+    for def in &prog.definitions {
+        match def {
+            Def::Fn(_, _, _, body) => check_impl(&body, &mut env)?,
+        };
+    }
+
+    // type check the main expression
+    check_impl(&prog.expression, &mut env)
 }
