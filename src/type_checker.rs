@@ -126,18 +126,22 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
         Expr::Seq(first, rest) => rest
             .iter()
             .try_fold(check_impl(first, env)?, |_, expr| check_impl(expr, env)),
-        Expr::App(_function, _arguments) => {
-            todo!()
+        Expr::App(function, arguments) => {
+            let function = check_impl(function, env)?;
+            let arguments = arguments.iter().try_fold(vec![], |mut arguments, expr| {
+                arguments.push(check_impl(expr, env)?);
+                Ok(arguments)
+            })?;
+
+            match function {
+                Type::Fn(parameters, return_type) if arguments == parameters => Ok(*return_type),
+                _ => Err(Error::TypeMismatch),
+            }
         }
     }
 }
 
-pub fn check_expr(expr: &Expr) -> Result<Type, Error> {
-    let mut env = vec![];
-    check_impl(expr, &mut env)
-}
-
-pub fn check_prog(prog: &Prog) -> Result<Type, Error> {
+pub fn check(prog: &Prog) -> Result<Type, Error> {
     // build the initial type environment from the given definitions
     let mut env = prog
         .definitions
@@ -151,12 +155,20 @@ pub fn check_prog(prog: &Prog) -> Result<Type, Error> {
                 )
             }
         })
-        .collect();
+        .collect::<Vec<(String, Type)>>();
 
     // type check the definitions
     for def in &prog.definitions {
         match def {
-            Def::Fn(_, _, _, body) => check_impl(&body, &mut env)?,
+            Def::Fn(_, parameters, _, body) => {
+                let previous_env_count = env.len();
+                for parameter in parameters {
+                    env.push(parameter.clone())
+                }
+
+                check_impl(&body, &mut env)?;
+                env.truncate(previous_env_count);
+            }
         };
     }
 

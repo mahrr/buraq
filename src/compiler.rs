@@ -1,4 +1,9 @@
-use crate::parser::Expr;
+use crate::parser::{Def, Expr, Prog};
+
+enum Location {
+    Index(u32), // index on the stack
+    Label,      // label (pointer), indenitifed by the name
+}
 
 fn generate_label(label: &str) -> String {
     static mut ID: u64 = 0;
@@ -15,14 +20,15 @@ fn stack_location(index: u32) -> String {
     format!("[rsp - {index}]")
 }
 
-fn name_stack_index(name: &String, env: &Vec<(String, u32)>) -> u32 {
+fn name_location(name: &String, env: &Vec<(String, Location)>) -> String {
     match env.iter().rev().find(|(id, _)| name == id) {
-        Some((_, index)) => *index,
-        None => unreachable!(), // should be caught at a previous phase,
+        Some((_, Location::Index(index))) => stack_location(*index),
+        Some((name, Location::Label)) => name.to_owned(),
+        None => unreachable!(),
     }
 }
 
-fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> String {
+fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>) -> String {
     macro_rules! compile_expr {
         ($e:expr) => {
             compile_expr($e, stack_index, env)
@@ -36,10 +42,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         Expr::Integer(number) => format!("    mov rax, {}", number),
 
         // identifier
-        Expr::Identifier(name) => format!(
-            "    mov rax, {}",
-            stack_location(name_stack_index(name, env))
-        ),
+        Expr::Identifier(name) => format!("    mov rax, {}", name_location(name, env)),
 
         // arithmetics
         Expr::Add(left, right) => {
@@ -229,7 +232,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
                 bindings_ins.push_str(&value);
                 bindings_ins.push_str(&format!("\n    mov {}, rax\n", stack_location(stack_index)));
 
-                env.push((String::clone(name), stack_index));
+                env.push((String::clone(name), Location::Index(stack_index)));
                 stack_index += 1;
             }
 
@@ -240,27 +243,110 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, u32)>) -> 
         }
         Expr::Set(name, value) => {
             let value = compile_expr!(value);
-            let index = name_stack_index(name, env);
-            format!("{value}\n    mov {}, rax", stack_location(index))
+            format!("{value}\n    mov {}, rax", name_location(name, env))
         }
         Expr::Seq(first, rest) => rest.iter().fold(compile_expr!(first), |output, expr| {
             format!("{output}\n{}", compile_expr!(expr))
         }),
-        Expr::App(_function, _arguments) => {
-            todo!()
+        Expr::App(function, arguments) => {
+            let after_call_label = generate_label("after_call");
+            let function = compile_expr!(function);
+            let arguments = arguments
+                .iter()
+                .enumerate()
+                .map(|(i, arg)| {
+                    // +2, because the previous RSP and the return address are pushed
+                    // into the stack before the called function arguments
+                    let stack_index = stack_index + 2 + i as u32;
+                    format!(
+                        "{0}\n    mov {1}, rax",
+                        compile_expr(arg, stack_index, env),
+                        stack_location(stack_index)
+                    )
+                })
+                .collect::<Vec<String>>()
+                .join("\n");
+
+            format!(
+                "{function}
+    ; save function address
+    mov rcx, rax
+    ; push previous RSP
+    mov {0}, rsp
+    mov rax, {after_call_label}
+    ; save return address
+    mov {1}, rax
+{arguments}
+    ; move RSP to the caller frame
+    sub rsp, {2}
+    ; move RSP to the caller frame
+    jmp rcx
+{after_call_label}:
+    ; pop previous RSP
+    mov rsp, [rsp]",
+                stack_location(stack_index),
+                stack_location(stack_index + 1),
+                (stack_index + 1) * 8 // return address slot
+            )
         }
     }
 }
 
-pub fn compile(expr: &Expr) -> String {
-    let mut env = vec![];
+fn compile_defs(definitions: &Vec<Def>, env: &mut Vec<(String, Location)>) -> String {
+    fn compile_def(def: &Def, env: &mut Vec<(String, Location)>) -> String {
+        // Frame:
+        //  [ previous rsp value ]
+        //  [ return address     ] <- current rsp
+        //                            (index++)
+        //  [ argument_1 (most left)  ]
+        //  | ...                     |
+        //  [ argument_N (most right) ] (index += N)
+
+        match def {
+            Def::Fn(name, parameters, _, body) => {
+                let previous_env_count = env.len();
+
+                // push the function parameters stack location into the environment
+                for i in 0..parameters.len() {
+                    let entry = (parameters[i].0.to_owned(), Location::Index(i as u32 + 1));
+                    env.push(entry)
+                }
+
+                // +1, because the first entry on the stack is reserved for the return address
+                let stack_index = parameters.len() as u32 + 1;
+                let body = compile_expr(body, stack_index, env);
+
+                env.truncate(previous_env_count);
+                format!("{name}:\n{body}\n    ret")
+            }
+        }
+    }
+
+    definitions
+        .iter()
+        .map(|def| compile_def(def, env))
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
+pub fn compile(prog: &Prog) -> String {
+    // construct the initial environment from the global definitions
+    let mut env: Vec<(String, Location)> = prog
+        .definitions
+        .iter()
+        .map(|def| match def {
+            Def::Fn(name, _, _, _) => (name.to_owned(), Location::Label),
+        })
+        .collect();
 
     format!(
         "    section .text
     global boot
+{}
 boot:
 {}
     ret",
-        compile_expr(expr, 1, &mut env)
+        compile_defs(&prog.definitions, &mut env),
+        compile_expr(&prog.expression, 1, &mut env)
     )
 }

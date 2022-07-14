@@ -26,26 +26,26 @@ fn main() {
         }
     };
 
-    // parse the source code into an S-Expression
-    let sexpr = match sexpr::parse(&file_content) {
-        Ok(sexpr) => sexpr,
+    // parse the source code into S-Expressions
+    let sexprs = match sexpr::parse_multiple(&file_content) {
+        Ok(sexprs) => sexprs,
         Err(error) => {
             eprintln!("error: {error}");
             process::exit(1);
         }
     };
 
-    // parse the S-Expression into a Buraq expression
-    let expr = match parser::parse_expr(&sexpr) {
-        Ok(expr) => expr,
+    // parse the S-Expression into a Buraq program
+    let prog = match parser::parse_prog(&sexprs) {
+        Ok(prog) => prog,
         Err(error) => {
             eprintln!("error: {error}");
             process::exit(1);
         }
     };
 
-    // type check the parse Buraq expression
-    match type_checker::check_expr(&expr) {
+    // type check the parsed Buraq program
+    match type_checker::check(&prog) {
         Ok(_) => (),
         Err(error) => {
             eprintln!("error: {error}");
@@ -53,6 +53,6 @@ fn main() {
         }
     }
 
-    // compile the expression and dump the result to stdout
-    println!("{}", compiler::compile(&expr));
+    // compile the program and dump the result to stdout
+    println!("{}", compiler::compile(&prog));
 }

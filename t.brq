@@ -1,10 +1,14 @@
+(defn add (
+        (x i64)
+        (y i64)
+    ) i64
+    (+ x y)
+)
+
 (let
-    ((x 0))
-    (seq
-        (while
-            (< x 10)
-            (set x (+ x 1))
-        )
-        x
+    (
+        (x (add 1 2))
+        (y (add x x))
     )
+    (add x y)
 )

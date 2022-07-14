@@ -58,6 +58,7 @@ fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Result<SExpr, E
     }
 }
 
+#[allow(dead_code)]
 pub fn parse(source: &String) -> Result<SExpr, Error> {
     parse_impl(&mut source.chars().peekable())
 }
