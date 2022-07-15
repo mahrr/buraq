@@ -21,6 +21,7 @@ pub enum Expr {
     Let(Vec<(String, Expr)>, Box<Expr>), // (vars, vals), body
     Set(String, Box<Expr>),              // var, val
     Seq(Box<Expr>, Vec<Expr>),           // first, ..rest
+    Lambda(Vec<(String, Type)>, Type, Box<Expr>), // parameters, return_type, body
     App(Box<Expr>, Vec<Expr>),           // function, arguments
 }
 
@@ -80,6 +81,23 @@ fn parse_type(sexpr: &SExpr) -> Result<Type, Error> {
         SExpr::Symbol(keyword) if keyword == "bool" => Ok(Type::Boolean),
         _ => Err(Error::InvalidType),
     }
+}
+
+fn parse_parameters(sexprs: &Vec<SExpr>) -> Result<Vec<(String, Type)>, Error> {
+    use SExpr::*;
+
+    sexprs
+        .iter()
+        .try_fold(vec![], |mut parameters, sexpr| match sexpr {
+            List(elements) => match &elements[..] {
+                [Symbol(name), type_] => {
+                    parameters.push((name.to_owned(), parse_type(type_)?));
+                    Ok(parameters)
+                }
+                _ => Err(Error::InvalidDef),
+            },
+            Symbol(_) => Err(Error::InvalidDef),
+        })
 }
 
 pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
@@ -211,6 +229,12 @@ pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
                 })?;
                 Ok(Expr::Seq(first, rest))
             }
+            [Symbol(keyword), List(parameters), return_type, body] if keyword == "lam" => {
+                let parameters = parse_parameters(parameters)?;
+                let return_type = parse_type(return_type)?;
+                let body = Box::new(parse_expr(body)?);
+                Ok(Expr::Lambda(parameters, return_type, body))
+            }
             [function, arguments @ ..] => {
                 let function = Box::new(parse_expr(function)?);
                 let arguments = arguments.iter().try_fold(vec![], |mut arguments, sexpr| {
@@ -232,20 +256,9 @@ pub fn parse_def(sexpr: &SExpr) -> Result<Def, Error> {
             [Symbol(keyword), Symbol(name), List(parameters), return_type, body]
                 if keyword == "defn" =>
             {
+                let parameters = parse_parameters(parameters)?;
                 let return_type = parse_type(return_type)?;
                 let body = parse_expr(body)?;
-                let parameters = parameters
-                    .iter()
-                    .try_fold(vec![], |mut parameters, sexpr| match sexpr {
-                        List(elements) => match &elements[..] {
-                            [SExpr::Symbol(name), type_] => {
-                                parameters.push((name.to_owned(), parse_type(type_)?));
-                                Ok(parameters)
-                            }
-                            _ => Err(Error::InvalidDef),
-                        },
-                        Symbol(_) => Err(Error::InvalidDef),
-                    })?;
                 Ok(Def::Fn(name.to_owned(), parameters, return_type, body))
             }
             _ => Err(Error::InvalidDef),

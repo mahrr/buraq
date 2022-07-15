@@ -126,6 +126,21 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
         Expr::Seq(first, rest) => rest
             .iter()
             .try_fold(check_impl(first, env)?, |_, expr| check_impl(expr, env)),
+        Expr::Lambda(parameters, return_type, body) => {
+            let previous_env_count = env.len();
+            for parameter in parameters {
+                env.push(parameter.clone())
+            }
+
+            let body_type = check_impl(&body, env)?;
+            env.truncate(previous_env_count);
+
+            if body_type == *return_type {
+                Ok(return_type.to_owned())
+            } else {
+                Err(Error::TypeMismatch)
+            }
+        }
         Expr::App(function, arguments) => {
             let function = check_impl(function, env)?;
             let arguments = arguments.iter().try_fold(vec![], |mut arguments, expr| {
@@ -160,14 +175,18 @@ pub fn check(prog: &Prog) -> Result<Type, Error> {
     // type check the definitions
     for def in &prog.definitions {
         match def {
-            Def::Fn(_, parameters, _, body) => {
+            Def::Fn(_, parameters, return_type, body) => {
                 let previous_env_count = env.len();
                 for parameter in parameters {
                     env.push(parameter.clone())
                 }
 
-                check_impl(&body, &mut env)?;
+                let body_type = check_impl(&body, &mut env)?;
                 env.truncate(previous_env_count);
+
+                if body_type != *return_type {
+                    return Err(Error::TypeMismatch);
+                }
             }
         };
     }

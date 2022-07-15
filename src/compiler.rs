@@ -248,6 +248,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
         Expr::Seq(first, rest) => rest.iter().fold(compile_expr!(first), |output, expr| {
             format!("{output}\n{}", compile_expr!(expr))
         }),
+        Expr::Lambda(_parameters, _, _body) => {
+            todo!()
+        }
         Expr::App(function, arguments) => {
             let after_call_label = generate_label("after_call");
             let function = compile_expr!(function);
