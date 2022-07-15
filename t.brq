@@ -1,14 +1,7 @@
-(defn add (
-        (x i64)
-        (y i64)
-    ) i64
-    (+ x y)
+(defn fib ((n i64)) i64
+    (if (< n 2)
+        n
+        (+ (fib (- n 1)) (fib (- n 2))))
 )
 
-(let
-    (
-        (x (add 1 2))
-        (y (add x x))
-    )
-    (add x y)
-)
+(fib 35)

@@ -63,9 +63,9 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 "{left}
     mov {0}, rax
 {right}
-    mov rbx, rax
+    mov rdi, rax
     mov rax, {0}
-    sub rax, rbx",
+    sub rax, rdi",
                 stack_location(stack_index)
             )
         }
@@ -87,10 +87,10 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 "{left}
     mov {0}, rax
 {right}
-    mov rbx, rax
+    mov rdi, rax
     mov rax, {0}
     xor rdx, rdx
-    idiv rbx",
+    idiv rdi",
                 stack_location(stack_index)
             )
         }
@@ -103,8 +103,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 "{left}
     mov {0}, rax
 {right}
-    mov rbx, {0}
-    cmp rbx, rax
+    mov rdi, {0}
+    cmp rdi, rax
     setl al
     movzx eax, al",
                 stack_location(stack_index)
@@ -117,8 +117,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 "{left}
     mov {0}, rax
 {right}
-    mov rbx, {0}
-    cmp rbx, rax
+    mov rdi, {0}
+    cmp rdi, rax
     setg al
     movzx eax, al",
                 stack_location(stack_index)
@@ -131,8 +131,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 "{left}
     mov {0}, rax
 {right}
-    mov rbx, {0}
-    cmp rbx, rax
+    mov rdi, {0}
+    cmp rdi, rax
     setle al
     movzx eax, al",
                 stack_location(stack_index)
@@ -145,8 +145,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 "{left}
     mov {0}, rax
 {right}
-    mov rbx, {0}
-    cmp rbx, rax
+    mov rdi, {0}
+    cmp rdi, rax
     setg al
     movzx eax, al",
                 stack_location(stack_index)
@@ -159,8 +159,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 "{left}
     mov {0}, rax
 {right}
-    mov rbx, {0}
-    cmp rbx, rax
+    mov rdi, {0}
+    cmp rdi, rax
     sete al
     movzx eax, al",
                 stack_location(stack_index)
