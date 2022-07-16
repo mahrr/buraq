@@ -136,7 +136,13 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
             env.truncate(previous_env_count);
 
             if body_type == *return_type {
-                Ok(return_type.to_owned())
+                Ok(Type::Fn(
+                    parameters
+                        .iter()
+                        .map(|(_, t)| t.clone())
+                        .collect::<Vec<Type>>(),
+                    Box::new(return_type.clone()),
+                ))
             } else {
                 Err(Error::TypeMismatch)
             }
