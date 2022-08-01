@@ -21,7 +21,7 @@ pub enum Expr {
     Let(Vec<(String, Expr)>, Box<Expr>), // (vars, vals), body
     Set(String, Box<Expr>),              // var, val
     Seq(Box<Expr>, Vec<Expr>),           // first, ..rest
-    Lambda(Vec<(String, Type)>, Type, Box<Expr>), // parameters, return_type, body
+    Lambda(Vec<(String, Type)>, Type, Box<Expr>, Vec<String>), // parameters, return_type, body, captures
     App(Box<Expr>, Vec<Expr>),           // function, arguments
 }
 
@@ -256,7 +256,7 @@ pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
                 let parameters = parse_parameters(parameters)?;
                 let return_type = parse_type(return_type)?;
                 let body = Box::new(parse_expr(body)?);
-                Ok(Expr::Lambda(parameters, return_type, body))
+                Ok(Expr::Lambda(parameters, return_type, body, vec![]))
             }
             [function, arguments @ ..] => {
                 let function = Box::new(parse_expr(function)?);

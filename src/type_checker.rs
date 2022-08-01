@@ -26,7 +26,7 @@ pub enum Type {
 fn name_type(name: &String, env: &Vec<(String, Type)>) -> Result<Type, Error> {
     match env.iter().rev().find(|(id, _)| name == id) {
         Some((_, type_)) => Ok(type_.to_owned()),
-        _ => Err(Error::UnboundName(name.to_owned())),
+        None => Err(Error::UnboundName(name.to_owned())),
     }
 }
 
@@ -126,7 +126,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
         Expr::Seq(first, rest) => rest
             .iter()
             .try_fold(check_impl(first, env)?, |_, expr| check_impl(expr, env)),
-        Expr::Lambda(parameters, return_type, body) => {
+        Expr::Lambda(parameters, return_type, body, _) => {
             let previous_env_count = env.len();
             for parameter in parameters {
                 env.push(parameter.clone())

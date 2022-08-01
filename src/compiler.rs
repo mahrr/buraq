@@ -1,5 +1,135 @@
 use crate::parser::{Def, Expr, Prog};
 
+// Semantic Analysis (currently only to set lambda captures)
+
+fn find_lambda_captures_expr(
+    expr: &mut Expr,
+    global_definitions: &Vec<String>,
+    current_scope: &mut Vec<String>, // current scope only, not the surrounding lexical scopes
+    captures: &mut Vec<String>,
+) {
+    macro_rules! find_lambda_captures_expr {
+        ($e:expr) => {
+            find_lambda_captures_expr($e, global_definitions, current_scope, captures)
+        };
+    }
+
+    match expr {
+        Expr::Boolean(_) | Expr::Integer(_) => {}
+        Expr::Identifier(id) => match current_scope.iter().rev().find(|&name| name == id) {
+            Some(_) => {} // already exists in the **current** lexical scope
+            None => {
+                // check if the name exits in the global definitions, othewise it's a captured name
+                if let None = global_definitions.iter().find(|&name| name == id) {
+                    captures.push(id.to_owned())
+                }
+            },
+        },
+        Expr::Add(left, right)
+        | Expr::Sub(left, right)
+        | Expr::Mul(left, right)
+        | Expr::Div(left, right)
+        | Expr::LT(left, right)
+        | Expr::GT(left, right)
+        | Expr::LE(left, right)
+        | Expr::GE(left, right)
+        | Expr::EQ(left, right) => {
+            find_lambda_captures_expr!(left);
+            find_lambda_captures_expr!(right);
+        }
+        Expr::If(cond, then_, else_) => {
+            find_lambda_captures_expr!(cond);
+            find_lambda_captures_expr!(then_);
+            find_lambda_captures_expr!(else_);
+        }
+        Expr::Cond(variants, else_) => {
+            variants.iter_mut().for_each(|(cond, action)| {
+                find_lambda_captures_expr!(cond);
+                find_lambda_captures_expr!(action);
+            });
+            find_lambda_captures_expr!(else_);
+        }
+        Expr::While(cond, body) => {
+            find_lambda_captures_expr!(cond);
+            find_lambda_captures_expr!(body);
+        }
+        Expr::Let(bindings, body) => {
+            let scope_prev_count = current_scope.len();
+
+            // add let bindings to the current lexical scope
+            for (name, _) in bindings {
+                current_scope.push(name.to_owned());
+            }
+
+            find_lambda_captures_expr!(body);
+
+            // reset the scope count to contain only global definitions
+            current_scope.truncate(scope_prev_count);
+        }
+        Expr::Set(id, value) => {
+            match current_scope.iter().rev().find(|&name| name == id) {
+                Some(_) => {} // already exists in the **current** lexical scope
+                None => captures.push(id.to_owned())
+            };
+            find_lambda_captures_expr!(value);
+        }
+        Expr::Seq(first, rest) => {
+            find_lambda_captures_expr!(first);
+            rest.iter_mut().for_each(|expr| find_lambda_captures_expr!(expr));
+        }
+        Expr::Lambda(parameters, _, body, captures) => {
+            // new current scope
+            let mut current_scope = vec![];
+
+            // add lambda parameters to the current lexical scope
+            for (name, _) in parameters {
+                current_scope.push(name.to_owned());
+            }
+
+            // analyse the body of lambda, providing the captures buffer to fill it
+            find_lambda_captures_expr(body, global_definitions, &mut current_scope, captures);
+        }
+        Expr::App(function, arguments) => {
+            find_lambda_captures_expr!(function);
+            arguments
+                .iter_mut()
+                .for_each(|expr| find_lambda_captures_expr!(expr));
+        }
+    }
+}
+
+pub fn find_lambda_captures(prog: &mut Prog) {
+    let global_definitions = prog
+        .definitions
+        .iter()
+        .map(|def| match def {
+            Def::Fn(name, _, _, _) => name.clone(),
+        })
+        .collect::<Vec<String>>();
+
+    prog.definitions.iter_mut().for_each(|def| match def {
+        Def::Fn(_, parameters, _, body) => {
+            let mut current_scope = vec![];
+
+            // add parameters to the current lexical scope
+            for (name, _) in parameters {
+                current_scope.push(name.to_owned());
+            }
+
+            // analyse the body of the function
+            find_lambda_captures_expr(body, &global_definitions, &mut current_scope, &mut vec![]);
+        }
+    });
+    find_lambda_captures_expr(
+        &mut prog.expression,
+        &global_definitions,
+        &mut vec![],
+        &mut vec![],
+    );
+}
+
+// Compiler
+
 enum Location {
     Index(u32), // index on the stack
     Label,      // label (pointer), indenitifed by the name
@@ -248,7 +378,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
         Expr::Seq(first, rest) => rest.iter().fold(compile_expr!(first), |output, expr| {
             format!("{output}\n{}", compile_expr!(expr))
         }),
-        Expr::Lambda(_parameters, _, _body) => {
+        Expr::Lambda(_parameters, _, _body, _captures) => {
             todo!()
         }
         Expr::App(function, arguments) => {
