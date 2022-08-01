@@ -76,9 +76,32 @@ fn parse_integer(source: &String) -> Option<i64> {
 }
 
 fn parse_type(sexpr: &SExpr) -> Result<Type, Error> {
+    fn parse_parameters_types(sexpr: &SExpr) -> Result<Vec<Type>, Error> {
+        match sexpr {
+            SExpr::Symbol(_) => Ok(vec![parse_type(sexpr)?]),
+            SExpr::List(types) => {
+                let types = types.iter().try_fold(vec![], |mut types, sexpr| {
+                    types.push(parse_type(sexpr)?);
+                    Ok(types)
+                })?;
+                Ok(types)
+            }
+        }
+    }
+
     match sexpr {
+        // Literal Types
         SExpr::Symbol(keyword) if keyword == "i64" => Ok(Type::I64),
         SExpr::Symbol(keyword) if keyword == "bool" => Ok(Type::Boolean),
+        // Function Type
+        SExpr::List(elements) => match &elements[..] {
+            [parameters_types, SExpr::Symbol(delimiter), return_type] if delimiter == "->" => {
+                let parameters = parse_parameters_types(parameters_types)?;
+                let return_type = parse_type(return_type)?;
+                Ok(Type::Fn(parameters, Box::new(return_type)))
+            }
+            _ => Err(Error::InvalidType),
+        },
         _ => Err(Error::InvalidType),
     }
 }

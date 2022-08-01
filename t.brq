@@ -1,7 +1,5 @@
-(defn fib ((n i64)) i64
-    (if (< n 2)
-        n
-        (+ (fib (- n 1)) (fib (- n 2))))
+(defn counter ((n i64)) (() -> i64)
+    (lam () i64 (+ n 1))
 )
 
-(fib 35)
+((counter 10))
