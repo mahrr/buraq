@@ -52,8 +52,14 @@ impl fmt::Display for Error {
 }
 
 fn parse_integer(source: &String) -> Option<i64> {
+    let mut sign = 1i64;
     let mut result = 0i64;
-    let mut chars = source.chars();
+    let mut chars = source.chars().peekable();
+
+    if let Some('-') = chars.peek() {
+        chars.next(); // consume `-`
+        sign = -1i64;
+    }
 
     match chars.next() {
         Some(ch) => match ch.to_digit(10) {
@@ -72,7 +78,7 @@ fn parse_integer(source: &String) -> Option<i64> {
         }
     }
 
-    return Some(result);
+    return Some(result * sign);
 }
 
 fn parse_type(sexpr: &SExpr) -> Result<Type, Error> {

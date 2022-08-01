@@ -43,6 +43,10 @@ fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Result<SExpr, E
             }
             Ok(SExpr::List(elements))
         }
+        Some('#') => {
+            while let Some(_) = it.next_if(|ch| *ch != '\n') {}
+            parse_impl(it)
+        }
         Some(_) => {
             let mut symbol: String = String::new();
             while let Some(ch) = it.next_if(|&ch| !is_delimiter(ch)) {
@@ -98,6 +102,9 @@ mod tests {
 
         let symbol = String::from("@+/#$%^&*?1aA_");
         assert_eq!(parse(&symbol), Ok(SExpr::Symbol(symbol)));
+
+        let symbol = String::from("# this is comment\nfoo-bar");
+        assert_eq!(parse(&symbol), Ok(SExpr::Symbol("foo-bar".to_string())));
 
         let list = String::from("()");
         assert_eq!(parse(&list), Ok(SExpr::List(vec![])));
@@ -167,6 +174,7 @@ mod tests {
         assert_eq!(parse(&String::from(")foo bar)")), Err(Error));
         assert_eq!(parse(&String::from("(foo bar")), Err(Error));
         assert_eq!(parse(&String::from("(foo (bar (baz))")), Err(Error));
+        assert_eq!(parse(&String::from("# only comment")), Err(Error));
         assert_eq!(parse_multiple(&String::from("")), Err(Error));
         assert_eq!(parse_multiple(&String::from("(foo bar")), Err(Error));
         assert_eq!(parse_multiple(&String::from(")foo bar)")), Err(Error));

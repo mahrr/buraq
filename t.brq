@@ -1,6 +1,8 @@
-(defn rand () i64 1)
+# (defn rand () i64 1)
+#
+# (defn rand-counter ((x i64)) (() -> i64)
+#    (lam () i64 (+ x (rand))))
+#
+# ((rand-counter 2))
 
-(defn rand-counter ((x i64)) (() -> i64)
-    (lam () i64 (+ x (rand))))
-
-((rand-counter 2))
+(+ -5 -5)
