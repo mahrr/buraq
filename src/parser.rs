@@ -22,7 +22,7 @@ pub enum Expr {
     Set(String, Box<Expr>),              // var, val
     Seq(Box<Expr>, Vec<Expr>),           // first, ..rest
     Lambda(Vec<(String, Type)>, Type, Box<Expr>, Vec<String>), // parameters, return_type, body, captures
-    App(Box<Expr>, Vec<Expr>),           // function, arguments
+    App(Box<Expr>, Vec<Expr>),                                 // function, arguments
 }
 
 pub enum Def {

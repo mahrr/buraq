@@ -23,7 +23,7 @@ fn find_lambda_captures_expr(
                 if let None = global_definitions.iter().find(|&name| name == id) {
                     captures.push(id.to_owned())
                 }
-            },
+            }
         },
         Expr::Add(left, right)
         | Expr::Sub(left, right)
@@ -69,13 +69,14 @@ fn find_lambda_captures_expr(
         Expr::Set(id, value) => {
             match current_scope.iter().rev().find(|&name| name == id) {
                 Some(_) => {} // already exists in the **current** lexical scope
-                None => captures.push(id.to_owned())
+                None => captures.push(id.to_owned()),
             };
             find_lambda_captures_expr!(value);
         }
         Expr::Seq(first, rest) => {
             find_lambda_captures_expr!(first);
-            rest.iter_mut().for_each(|expr| find_lambda_captures_expr!(expr));
+            rest.iter_mut()
+                .for_each(|expr| find_lambda_captures_expr!(expr));
         }
         Expr::Lambda(parameters, _, body, captures) => {
             // new current scope

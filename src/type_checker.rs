@@ -4,6 +4,7 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     TypeMismatch,
+    AssignToConst(String),
     UnboundName(String),
 }
 
@@ -11,6 +12,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::TypeMismatch => write!(f, "type mismatch"),
+            Error::AssignToConst(name) => write!(f, "assign const name '{name}'"),
             Error::UnboundName(name) => write!(f, "unbound name '{name}'"),
         }
     }
@@ -23,14 +25,21 @@ pub enum Type {
     Fn(Vec<Type>, Box<Type>),
 }
 
-fn name_type(name: &String, env: &Vec<(String, Type)>) -> Result<Type, Error> {
-    match env.iter().rev().find(|(id, _)| name == id) {
-        Some((_, type_)) => Ok(type_.to_owned()),
+#[derive(Clone)]
+struct NameRecord {
+    name: String,
+    type_: Type,
+    is_const: bool,
+}
+
+fn name_record(name: &String, env: &Vec<NameRecord>) -> Result<NameRecord, Error> {
+    match env.iter().rev().find(|record| &record.name == name) {
+        Some(record) => Ok(record.to_owned()),
         None => Err(Error::UnboundName(name.to_owned())),
     }
 }
 
-fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error> {
+fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
     macro_rules! tc_arithmetic {
         ($left:expr, $right:expr) => {{
             let left = check_impl($left, env)?;
@@ -58,7 +67,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
     match expr {
         Expr::Boolean(_) => Ok(Type::Boolean),
         Expr::Integer(_) => Ok(Type::I64),
-        Expr::Identifier(name) => name_type(name, env),
+        Expr::Identifier(name) => Ok(name_record(name, env)?.type_),
         Expr::Add(left, right) => tc_arithmetic!(left, right),
         Expr::Sub(left, right) => tc_arithmetic!(left, right),
         Expr::Mul(left, right) => tc_arithmetic!(left, right),
@@ -106,8 +115,12 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
             let prev_bindings_count = env.len();
 
             for (name, value) in bindings {
-                let value = check_impl(value, env)?;
-                env.push((name.to_owned(), value));
+                let name_record = NameRecord {
+                    name: name.to_owned(),
+                    type_: check_impl(value, env)?,
+                    is_const: false,
+                };
+                env.push(name_record);
             }
 
             let body = check_impl(body, env);
@@ -115,12 +128,15 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
             body
         }
         Expr::Set(name, value) => {
-            let name = name_type(name, env)?;
+            let record = name_record(name, env)?;
             let value = check_impl(value, env)?;
-            if name == value {
-                Ok(name)
-            } else {
+
+            if record.is_const {
+                Err(Error::AssignToConst(name.to_owned()))
+            } else if record.type_ != value {
                 Err(Error::TypeMismatch)
+            } else {
+                Ok(record.type_)
             }
         }
         Expr::Seq(first, rest) => rest
@@ -129,7 +145,11 @@ fn check_impl(expr: &Expr, env: &mut Vec<(String, Type)>) -> Result<Type, Error>
         Expr::Lambda(parameters, return_type, body, _) => {
             let previous_env_count = env.len();
             for parameter in parameters {
-                env.push(parameter.clone())
+                env.push(NameRecord {
+                    name: parameter.0.to_owned(),
+                    type_: parameter.1.to_owned(),
+                    is_const: false,
+                })
             }
 
             let body_type = check_impl(&body, env)?;
@@ -170,13 +190,14 @@ pub fn check(prog: &Prog) -> Result<Type, Error> {
         .map(|def| match def {
             Def::Fn(name, parameters, return_type, _) => {
                 let parameters: Vec<Type> = parameters.iter().map(|p| p.1.to_owned()).collect();
-                (
-                    name.to_owned(),
-                    Type::Fn(parameters, Box::new(return_type.to_owned())),
-                )
+                NameRecord {
+                    name: name.to_owned(),
+                    type_: Type::Fn(parameters, Box::new(return_type.to_owned())),
+                    is_const: true,
+                }
             }
         })
-        .collect::<Vec<(String, Type)>>();
+        .collect::<Vec<NameRecord>>();
 
     // type check the definitions
     for def in &prog.definitions {
@@ -184,7 +205,11 @@ pub fn check(prog: &Prog) -> Result<Type, Error> {
             Def::Fn(_, parameters, return_type, body) => {
                 let previous_env_count = env.len();
                 for parameter in parameters {
-                    env.push(parameter.clone())
+                    env.push(NameRecord {
+                        name: parameter.0.to_owned(),
+                        type_: parameter.1.to_owned(),
+                        is_const: false,
+                    })
                 }
 
                 let body_type = check_impl(&body, &mut env)?;
