@@ -2,6 +2,7 @@ use crate::parser::{Def, Expr, Prog};
 
 // Semantic Analysis (currently only to set lambda captures)
 
+#[allow(dead_code)]
 fn find_lambda_captures_expr(
     expr: &mut Expr,
     global_definitions: &Vec<String>,
@@ -99,6 +100,7 @@ fn find_lambda_captures_expr(
     }
 }
 
+#[allow(dead_code)]
 pub fn find_lambda_captures(prog: &mut Prog) {
     let global_definitions = prog
         .definitions

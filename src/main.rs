@@ -36,7 +36,7 @@ fn main() {
     };
 
     // parse the S-Expression into a Buraq program
-    let mut prog = match parser::parse_prog(&sexprs) {
+    let prog = match parser::parse_prog(&sexprs) {
         Ok(prog) => prog,
         Err(error) => {
             eprintln!("error: {error}");
@@ -52,9 +52,6 @@ fn main() {
             process::exit(1);
         }
     }
-
-    // simple static analysis to find lambda captured names
-    compiler::find_lambda_captures(&mut prog);
 
     // compile the program and dump the result to stdout
     println!("{}", compiler::compile(&prog));
