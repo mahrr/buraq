@@ -134,8 +134,8 @@ pub fn find_lambda_captures(prog: &mut Prog) {
 // Compiler
 
 enum Location {
-    Index(u32), // index on the stack
-    Label,      // label (pointer), indenitifed by the name
+    Index(u32),    // index on the stack
+    FunctionLabel, // label (pointer), indenitifed by the name
 }
 
 fn generate_label(label: &str) -> String {
@@ -148,15 +148,32 @@ fn generate_label(label: &str) -> String {
     format!("{}_{}", label, id)
 }
 
+// buraq identifiers are sequence of non-terminating characters, i.e., whitespace
+// characters or parentheses, these identifiers cannot be used as labels, instead
+// this function escapes the necessary characters them so that they could be used
+// as labels
+fn sanitize_function_name(name: &String) -> String {
+    let mut sanitized = String::new();
+
+    for ch in name.chars() {
+        if ch.is_ascii_alphanumeric() {
+            sanitized.push(ch);
+        } else {
+            sanitized.push_str(&format!("_{0:x}_", ch as u32));
+        }
+    }
+
+    format!("_fn_{}", sanitized)
+}
+
 fn stack_location(index: u32) -> String {
-    let index = index * 8;
-    format!("[rsp - {index}]")
+    format!("[rsp - {}]", index * 8)
 }
 
 fn name_location(name: &String, env: &Vec<(String, Location)>) -> String {
     match env.iter().rev().find(|(id, _)| name == id) {
         Some((_, Location::Index(index))) => stack_location(*index),
-        Some((name, Location::Label)) => name.to_owned(),
+        Some((name, Location::FunctionLabel)) => sanitize_function_name(name),
         None => unreachable!(),
     }
 }
@@ -393,7 +410,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 .map(|(i, arg)| {
                     // +2, because the previous RSP and the return address are pushed
                     // into the stack before the called function arguments
-                    let stack_index = stack_index + 2 + i as u32;
+                    let stack_index = stack_index + (i as u32) + 2;
                     format!(
                         "{0}\n    mov {1}, rax",
                         compile_expr(arg, stack_index, env),
@@ -442,7 +459,7 @@ fn compile_defs(definitions: &Vec<Def>, env: &mut Vec<(String, Location)>) -> St
             Def::Fn(name, parameters, _, body) => {
                 let previous_env_count = env.len();
 
-                // push the function parameters stack location into the environment
+                // push the function parameters stack index into the environment
                 for i in 0..parameters.len() {
                     let entry = (parameters[i].0.to_owned(), Location::Index(i as u32 + 1));
                     env.push(entry)
@@ -453,7 +470,7 @@ fn compile_defs(definitions: &Vec<Def>, env: &mut Vec<(String, Location)>) -> St
                 let body = compile_expr(body, stack_index, env);
 
                 env.truncate(previous_env_count);
-                format!("{name}:\n{body}\n    ret")
+                format!("{}:\n{body}\n    ret", sanitize_function_name(name))
             }
         }
     }
@@ -471,7 +488,7 @@ pub fn compile(prog: &Prog) -> String {
         .definitions
         .iter()
         .map(|def| match def {
-            Def::Fn(name, _, _, _) => (name.to_owned(), Location::Label),
+            Def::Fn(name, _, _, _) => (name.to_owned(), Location::FunctionLabel),
         })
         .collect();
 
