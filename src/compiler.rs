@@ -79,7 +79,7 @@ fn find_lambda_captures_expr(
             rest.iter_mut()
                 .for_each(|expr| find_lambda_captures_expr!(expr));
         }
-        Expr::Lambda(parameters, _, body, captures) => {
+        Expr::Lambda(_, parameters, _, body, captures) => {
             // new current scope
             let mut current_scope = vec![];
 
@@ -138,7 +138,7 @@ enum Location {
     FunctionLabel, // label (pointer), indenitifed by the name
 }
 
-fn generate_label(label: &str) -> String {
+fn generate_distinct_label(label: &str) -> String {
     static mut ID: u64 = 0;
     let id: u64;
     unsafe {
@@ -146,6 +146,12 @@ fn generate_label(label: &str) -> String {
         ID += 1;
     }
     format!("{}_{}", label, id)
+}
+
+fn generate_lambda_label(id: u64) -> String {
+    // this won't clash with any function names, since the symbol `$` is escaped
+    // in function labels
+    format!("_lam_${}", id)
 }
 
 // buraq identifiers are sequence of non-terminating characters, i.e., whitespace
@@ -319,8 +325,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
 
         // constructs
         Expr::If(cond, then, else_) => {
-            let else_label = generate_label("else");
-            let end_label = generate_label("if_end");
+            let else_label = generate_distinct_label("else");
+            let end_label = generate_distinct_label("if_end");
             let cond = compile_expr!(cond);
             let then = compile_expr!(then);
             let else_ = compile_expr!(else_);
@@ -336,10 +342,10 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
             )
         }
         Expr::Cond(clauses, last_clause) => {
-            let cond_end_label = generate_label("cond_end");
+            let cond_end_label = generate_distinct_label("cond_end");
             let last_clause = compile_expr!(last_clause);
             let clauses = clauses.iter().fold(String::new(), |clauses, (test, form)| {
-                let clause_end_label = generate_label("clause_end");
+                let clause_end_label = generate_distinct_label("clause_end");
                 let test = compile_expr!(test);
                 let form = compile_expr!(form);
 
@@ -356,8 +362,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
             format!("{clauses}\n{last_clause}\n{cond_end_label}:")
         }
         Expr::While(cond, body) => {
-            let start_label = generate_label("while_start");
-            let exit_label = generate_label("while_exit");
+            let start_label = generate_distinct_label("while_start");
+            let exit_label = generate_distinct_label("while_exit");
             let cond = compile_expr!(cond);
             let body = compile_expr!(body);
             format!(
@@ -398,11 +404,35 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
         Expr::Seq(first, rest) => rest.iter().fold(compile_expr!(first), |output, expr| {
             format!("{output}\n{}", compile_expr!(expr))
         }),
-        Expr::Lambda(_parameters, _, _body, _captures) => {
-            todo!()
+        Expr::Lambda(id, parameters, _, body, _captures) => {
+            let lambda_label = generate_lambda_label(*id);
+            let after_lambda_label = generate_distinct_label("after_lambda");
+            let previous_env_count = env.len();
+
+            // push the function parameters stack index into the environment
+            for i in 0..parameters.len() {
+                let entry = (parameters[i].0.to_owned(), Location::Index(i as u32 + 1));
+                env.push(entry)
+            }
+
+            // +1, because the first entry on the stack is reserved for the return address
+            let stack_index = parameters.len() as u32 + 1;
+            let body = compile_expr(body, stack_index, env);
+
+            env.truncate(previous_env_count);
+            format!(
+                "    ; jump after the lambda definition
+    jmp {after_lambda_label}
+{lambda_label}:
+{body}
+    ret
+{after_lambda_label}:
+    ; move the lambda pointer (value) into rax
+    mov rax, {lambda_label}"
+            )
         }
         Expr::App(function, arguments) => {
-            let after_call_label = generate_label("after_call");
+            let after_call_label = generate_distinct_label("after_call");
             let function = compile_expr!(function);
             let arguments = arguments
                 .iter()
@@ -432,7 +462,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
 {arguments}
     ; move RSP to the caller frame
     sub rsp, {2}
-    ; move RSP to the caller frame
+    ; call the function
     jmp rcx
 {after_call_label}:
     ; pop previous RSP

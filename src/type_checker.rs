@@ -142,7 +142,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
         Expr::Seq(first, rest) => rest
             .iter()
             .try_fold(check_impl(first, env)?, |_, expr| check_impl(expr, env)),
-        Expr::Lambda(parameters, return_type, body, _) => {
+        Expr::Lambda(_, parameters, return_type, body, _) => {
             let previous_env_count = env.len();
             for parameter in parameters {
                 env.push(NameRecord {

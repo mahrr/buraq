@@ -1,10 +1,1 @@
-# (defn rand () i64 1)
-#
-# (defn rand-counter ((x i64)) (() -> i64)
-#    (lam () i64 (+ x (rand))))
-#
-# ((rand-counter 2))
-
-(defn !$x () i64 1)
-
-(!$x)
+((lam ((x i64)) i64 x) 1)
