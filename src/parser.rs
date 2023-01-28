@@ -125,6 +125,16 @@ fn parse_type(sexpr: &SExpr) -> Result<Type, Error> {
 fn parse_parameters(sexprs: &Vec<SExpr>) -> Result<Vec<(String, Type)>, Error> {
     use SExpr::*;
 
+    // check if it's a one parameter in the form: (<name> <type>)
+    if sexprs.len() == 2 {
+        match (&sexprs[0], &sexprs[1]) {
+            (Symbol(name), type_) => {
+                return Ok(vec![(name.to_owned(), parse_type(type_)?)])
+            },
+            _ => {}
+        }
+    }
+
     sexprs
         .iter()
         .try_fold(vec![], |mut parameters, sexpr| match sexpr {
