@@ -2,7 +2,7 @@ use crate::sexpr::SExpr;
 use crate::type_checker::Type;
 use std::fmt;
 
-pub enum Expr {
+pub enum ExprKind {
     Boolean(bool),
     Integer(i64),
     Float(f64),
@@ -22,8 +22,13 @@ pub enum Expr {
     Let(Vec<(String, Expr)>, Box<Expr>), // (vars, vals), body
     Set(String, Box<Expr>),              // var, val
     Seq(Box<Expr>, Vec<Expr>),           // first, ..rest
-    Lambda(u64, Vec<(String, Type)>, Type, Box<Expr>, Vec<String>), // id, parameters, return_type, body, captures
-    App(Box<Expr>, Vec<Expr>),                                      // function, arguments
+    Lambda(Vec<(String, Type)>, Type, Box<Expr>, Vec<String>), // parameters, return_type, body, captures
+    App(Box<Expr>, Vec<Expr>),                                 // function, arguments
+}
+
+pub struct Expr {
+    pub id: u64,
+    pub kind: ExprKind,
 }
 
 pub enum Def {
@@ -52,7 +57,7 @@ impl fmt::Display for Error {
     }
 }
 
-fn generate_lambda_id() -> u64 {
+fn generate_id() -> u64 {
     static mut ID: u64 = 0;
     let id: u64;
     unsafe {
@@ -77,7 +82,7 @@ fn parse_float(source: &String) -> Option<f64> {
             Some(number) => {
                 result = result * 10.0 + number as f64;
                 chars.next();
-            },
+            }
             None => break,
         }
     }
@@ -191,70 +196,79 @@ fn parse_parameters(sexprs: &Vec<SExpr>) -> Result<Vec<(String, Type)>, Error> {
 pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
     use SExpr::*;
 
+    macro_rules! E {
+        ($kind:expr) => {
+            Ok(Expr {
+                id: generate_id(),
+                kind: $kind,
+            })
+        };
+    }
+
     match sexpr {
         Symbol(symbol) => {
             if let Some(number) = parse_integer(&symbol) {
-                return Ok(Expr::Integer(number));
+                return E!(ExprKind::Integer(number));
             }
             if let Some(number) = parse_float(&symbol) {
-                return Ok(Expr::Float(number));
+                return E!(ExprKind::Float(number));
             }
             if symbol == "true" {
-                return Ok(Expr::Boolean(true));
+                return E!(ExprKind::Boolean(true));
             }
             if symbol == "false" {
-                return Ok(Expr::Boolean(false));
+                return E!(ExprKind::Boolean(false));
             }
-            Ok(Expr::Identifier(symbol.to_owned()))
+            E!(ExprKind::Identifier(symbol.to_owned()))
         }
         List(elements) => match &elements[..] {
             // arithmetics
             [Symbol(op), left, right] if op == "+" => {
                 let left = Box::new(parse_expr(left)?);
                 let right = Box::new(parse_expr(right)?);
-                Ok(Expr::Add(left, right))
+                E!(ExprKind::Add(left, right))
             }
             [Symbol(op), left, right] if op == "-" => {
                 let left = Box::new(parse_expr(left)?);
                 let right = Box::new(parse_expr(right)?);
-                Ok(Expr::Sub(left, right))
+                E!(ExprKind::Sub(left, right))
             }
             [Symbol(op), left, right] if op == "*" => {
                 let left = Box::new(parse_expr(left)?);
                 let right = Box::new(parse_expr(right)?);
-                Ok(Expr::Mul(left, right))
+                E!(ExprKind::Mul(left, right))
             }
             [Symbol(op), left, right] if op == "/" => {
                 let left = Box::new(parse_expr(left)?);
                 let right = Box::new(parse_expr(right)?);
-                Ok(Expr::Div(left, right))
+                E!(ExprKind::Div(left, right))
             }
 
             // comparison
             [Symbol(op), left, right] if op == "<" => {
                 let left = Box::new(parse_expr(left)?);
                 let right = Box::new(parse_expr(right)?);
-                Ok(Expr::LT(left, right))
+                E!(ExprKind::LT(left, right))
             }
             [Symbol(op), left, right] if op == ">" => {
                 let left = Box::new(parse_expr(left)?);
                 let right = Box::new(parse_expr(right)?);
-                Ok(Expr::GT(left, right))
+                E!(ExprKind::GT(left, right))
             }
             [Symbol(op), left, right] if op == "<=" => {
                 let left = Box::new(parse_expr(left)?);
                 let right = Box::new(parse_expr(right)?);
-                Ok(Expr::LE(left, right))
+                E!(ExprKind::LE(left, right))
             }
             [Symbol(op), left, right] if op == ">=" => {
                 let left = Box::new(parse_expr(left)?);
                 let right = Box::new(parse_expr(right)?);
-                Ok(Expr::GE(left, right))
+                E!(ExprKind::GE(left, right))
             }
             [Symbol(op), left, right] if op == "=" => {
                 let left = Box::new(parse_expr(left)?);
                 let right = Box::new(parse_expr(right)?);
-                Ok(Expr::EQ(left, right))
+                E!(ExprKind::EQ(left, right))
             }
 
             // constructs
@@ -262,7 +276,7 @@ pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
                 let cond = Box::new(parse_expr(cond)?);
                 let then = Box::new(parse_expr(then)?);
                 let else_ = Box::new(parse_expr(else_)?);
-                Ok(Expr::If(cond, then, else_))
+                E!(ExprKind::If(cond, then, else_))
             }
             [Symbol(keyword), clauses @ .., List(last_clause)] if keyword == "cond" => {
                 let last_clause = match &last_clause[..] {
@@ -284,12 +298,12 @@ pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
                             _ => Err(Error::InvalidExpr),
                         })?;
 
-                Ok(Expr::Cond(clauses, Box::new(last_clause)))
+                E!(ExprKind::Cond(clauses, Box::new(last_clause)))
             }
             [Symbol(keyword), cond, body] if keyword == "while" => {
                 let cond = Box::new(parse_expr(cond)?);
                 let body = Box::new(parse_expr(body)?);
-                Ok(Expr::While(cond, body))
+                E!(ExprKind::While(cond, body))
             }
             [Symbol(keyword), List(bindings), body] if keyword == "let" => {
                 let body = Box::new(parse_expr(body)?);
@@ -307,10 +321,10 @@ pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
                             _ => Err(Error::InvalidExpr),
                         })?;
 
-                Ok(Expr::Let(bindings, body))
+                E!(ExprKind::Let(bindings, body))
             }
             [Symbol(keyword), Symbol(name), value] if keyword == "set" => {
-                Ok(Expr::Set(name.to_owned(), Box::new(parse_expr(value)?)))
+                E!(ExprKind::Set(name.to_owned(), Box::new(parse_expr(value)?)))
             }
             [Symbol(keyword), first, rest @ ..] if keyword == "seq" => {
                 let first = Box::new(parse_expr(first)?);
@@ -318,19 +332,13 @@ pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
                     rest.push(parse_expr(sexpr)?);
                     Ok(rest)
                 })?;
-                Ok(Expr::Seq(first, rest))
+                E!(ExprKind::Seq(first, rest))
             }
             [Symbol(keyword), List(parameters), return_type, body] if keyword == "lam" => {
                 let parameters = parse_parameters(parameters)?;
                 let return_type = parse_type(return_type)?;
                 let body = Box::new(parse_expr(body)?);
-                Ok(Expr::Lambda(
-                    generate_lambda_id(),
-                    parameters,
-                    return_type,
-                    body,
-                    vec![],
-                ))
+                E!(ExprKind::Lambda(parameters, return_type, body, vec![],))
             }
             [function, arguments @ ..] => {
                 let function = Box::new(parse_expr(function)?);
@@ -338,7 +346,7 @@ pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
                     arguments.push(parse_expr(sexpr)?);
                     Ok(arguments)
                 })?;
-                Ok(Expr::App(function, arguments))
+                E!(ExprKind::App(function, arguments))
             }
             _ => Err(Error::InvalidExpr),
         },

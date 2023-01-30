@@ -1,4 +1,4 @@
-use crate::parser::{Def, Expr, Prog};
+use crate::parser::{Def, Expr, ExprKind, Prog};
 
 // Semantic Analysis (currently only to set lambda captures)
 
@@ -15,9 +15,9 @@ fn find_lambda_captures_expr(
         };
     }
 
-    match expr {
-        Expr::Boolean(_) | Expr::Integer(_) | Expr::Float(_) => {}
-        Expr::Identifier(id) => match current_scope.iter().rev().find(|&name| name == id) {
+    match &mut expr.kind {
+        ExprKind::Boolean(_) | ExprKind::Integer(_) | ExprKind::Float(_) => {}
+        ExprKind::Identifier(id) => match current_scope.iter().rev().find(|&name| name == id) {
             Some(_) => {} // already exists in the **current** lexical scope
             None => {
                 // check if the name exits in the global definitions, othewise it's a captured name
@@ -26,35 +26,35 @@ fn find_lambda_captures_expr(
                 }
             }
         },
-        Expr::Add(left, right)
-        | Expr::Sub(left, right)
-        | Expr::Mul(left, right)
-        | Expr::Div(left, right)
-        | Expr::LT(left, right)
-        | Expr::GT(left, right)
-        | Expr::LE(left, right)
-        | Expr::GE(left, right)
-        | Expr::EQ(left, right) => {
+        ExprKind::Add(left, right)
+        | ExprKind::Sub(left, right)
+        | ExprKind::Mul(left, right)
+        | ExprKind::Div(left, right)
+        | ExprKind::LT(left, right)
+        | ExprKind::GT(left, right)
+        | ExprKind::LE(left, right)
+        | ExprKind::GE(left, right)
+        | ExprKind::EQ(left, right) => {
             find_lambda_captures_expr!(left);
             find_lambda_captures_expr!(right);
         }
-        Expr::If(cond, then_, else_) => {
+        ExprKind::If(cond, then_, else_) => {
             find_lambda_captures_expr!(cond);
             find_lambda_captures_expr!(then_);
             find_lambda_captures_expr!(else_);
         }
-        Expr::Cond(variants, else_) => {
+        ExprKind::Cond(variants, else_) => {
             variants.iter_mut().for_each(|(cond, action)| {
                 find_lambda_captures_expr!(cond);
                 find_lambda_captures_expr!(action);
             });
             find_lambda_captures_expr!(else_);
         }
-        Expr::While(cond, body) => {
+        ExprKind::While(cond, body) => {
             find_lambda_captures_expr!(cond);
             find_lambda_captures_expr!(body);
         }
-        Expr::Let(bindings, body) => {
+        ExprKind::Let(bindings, body) => {
             let scope_prev_count = current_scope.len();
 
             // add let bindings to the current lexical scope
@@ -67,19 +67,19 @@ fn find_lambda_captures_expr(
             // reset the scope count to contain only global definitions
             current_scope.truncate(scope_prev_count);
         }
-        Expr::Set(id, value) => {
+        ExprKind::Set(id, value) => {
             match current_scope.iter().rev().find(|&name| name == id) {
                 Some(_) => {} // already exists in the **current** lexical scope
                 None => captures.push(id.to_owned()),
             };
             find_lambda_captures_expr!(value);
         }
-        Expr::Seq(first, rest) => {
+        ExprKind::Seq(first, rest) => {
             find_lambda_captures_expr!(first);
             rest.iter_mut()
                 .for_each(|expr| find_lambda_captures_expr!(expr));
         }
-        Expr::Lambda(_, parameters, _, body, captures) => {
+        ExprKind::Lambda(parameters, _, body, captures) => {
             // new current scope
             let mut current_scope = vec![];
 
@@ -91,7 +91,7 @@ fn find_lambda_captures_expr(
             // analyse the body of lambda, providing the captures buffer to fill it
             find_lambda_captures_expr(body, global_definitions, &mut current_scope, captures);
         }
-        Expr::App(function, arguments) => {
+        ExprKind::App(function, arguments) => {
             find_lambda_captures_expr!(function);
             arguments
                 .iter_mut()
@@ -191,18 +191,18 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
         };
     }
 
-    match expr {
+    match &expr.kind {
         // literals
-        Expr::Boolean(true) => String::from("    mov rax, 1"),
-        Expr::Boolean(false) => String::from("    mov rax, 0"),
-        Expr::Integer(number) => format!("    mov rax, {}", number),
-        Expr::Float(_number) => todo!(),
+        ExprKind::Boolean(true) => String::from("    mov rax, 1"),
+        ExprKind::Boolean(false) => String::from("    mov rax, 0"),
+        ExprKind::Integer(number) => format!("    mov rax, {}", number),
+        ExprKind::Float(_number) => todo!(),
 
         // identifier
-        Expr::Identifier(name) => format!("    mov rax, {}", name_location(name, env)),
+        ExprKind::Identifier(name) => format!("    mov rax, {}", name_location(name, env)),
 
         // arithmetics
-        Expr::Add(left, right) => {
+        ExprKind::Add(left, right) => {
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index + 1, env);
             format!(
@@ -213,7 +213,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 stack_location(stack_index)
             )
         }
-        Expr::Sub(left, right) => {
+        ExprKind::Sub(left, right) => {
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index + 1, env);
             format!(
@@ -226,7 +226,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 stack_location(stack_index)
             )
         }
-        Expr::Mul(left, right) => {
+        ExprKind::Mul(left, right) => {
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index + 1, env);
             format!(
@@ -237,7 +237,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 stack_location(stack_index)
             )
         }
-        Expr::Div(left, right) => {
+        ExprKind::Div(left, right) => {
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index + 1, env);
             format!(
@@ -253,7 +253,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
         }
 
         // comparison
-        Expr::LT(left, right) => {
+        ExprKind::LT(left, right) => {
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index + 1, env);
             format!(
@@ -267,7 +267,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 stack_location(stack_index)
             )
         }
-        Expr::GT(left, right) => {
+        ExprKind::GT(left, right) => {
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index + 1, env);
             format!(
@@ -281,7 +281,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 stack_location(stack_index)
             )
         }
-        Expr::LE(left, right) => {
+        ExprKind::LE(left, right) => {
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index + 1, env);
             format!(
@@ -295,7 +295,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 stack_location(stack_index)
             )
         }
-        Expr::GE(left, right) => {
+        ExprKind::GE(left, right) => {
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index + 1, env);
             format!(
@@ -309,7 +309,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 stack_location(stack_index)
             )
         }
-        Expr::EQ(left, right) => {
+        ExprKind::EQ(left, right) => {
             let left = compile_expr(left, stack_index, env);
             let right = compile_expr(right, stack_index + 1, env);
             format!(
@@ -325,7 +325,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
         }
 
         // constructs
-        Expr::If(cond, then, else_) => {
+        ExprKind::If(cond, then, else_) => {
             let else_label = generate_distinct_label("else");
             let end_label = generate_distinct_label("if_end");
             let cond = compile_expr!(cond);
@@ -342,7 +342,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
 {end_label}:"
             )
         }
-        Expr::Cond(clauses, last_clause) => {
+        ExprKind::Cond(clauses, last_clause) => {
             let cond_end_label = generate_distinct_label("cond_end");
             let last_clause = compile_expr!(last_clause);
             let clauses = clauses.iter().fold(String::new(), |clauses, (test, form)| {
@@ -362,7 +362,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
             });
             format!("{clauses}\n{last_clause}\n{cond_end_label}:")
         }
-        Expr::While(cond, body) => {
+        ExprKind::While(cond, body) => {
             let start_label = generate_distinct_label("while_start");
             let exit_label = generate_distinct_label("while_exit");
             let cond = compile_expr!(cond);
@@ -378,7 +378,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
 "
             )
         }
-        Expr::Let(bindings, body) => {
+        ExprKind::Let(bindings, body) => {
             let previous_bindings_count = env.len();
             let mut bindings_ins = String::new();
             let mut stack_index = stack_index;
@@ -398,15 +398,15 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
 
             format!("{bindings_ins}{body}")
         }
-        Expr::Set(name, value) => {
+        ExprKind::Set(name, value) => {
             let value = compile_expr!(value);
             format!("{value}\n    mov {}, rax", name_location(name, env))
         }
-        Expr::Seq(first, rest) => rest.iter().fold(compile_expr!(first), |output, expr| {
+        ExprKind::Seq(first, rest) => rest.iter().fold(compile_expr!(first), |output, expr| {
             format!("{output}\n{}", compile_expr!(expr))
         }),
-        Expr::Lambda(id, parameters, _, body, _captures) => {
-            let lambda_label = generate_lambda_label(*id);
+        ExprKind::Lambda(parameters, _, body, _captures) => {
+            let lambda_label = generate_lambda_label(expr.id);
             let after_lambda_label = generate_distinct_label("after_lambda");
             let previous_env_count = env.len();
 
@@ -432,7 +432,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
     mov rax, {lambda_label}"
             )
         }
-        Expr::App(function, arguments) => {
+        ExprKind::App(function, arguments) => {
             let after_call_label = generate_distinct_label("after_call");
             let function = compile_expr!(function);
             let arguments = arguments
