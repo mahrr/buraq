@@ -12,7 +12,7 @@ mod type_checker;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
-        eprintln!("usage: boruq <file-name>");
+        eprintln!("usage: buraq <file-name>");
         process::exit(1);
     }
 

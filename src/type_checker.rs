@@ -21,6 +21,7 @@ impl fmt::Display for Error {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     I64,
+    F64,
     Boolean,
     Fn(Vec<Type>, Box<Type>),
 }
@@ -47,6 +48,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
 
             match (left, right) {
                 (Type::I64, Type::I64) => Ok(Type::I64),
+                (Type::F64, Type::F64) => Ok(Type::F64),
                 _ => Err(Error::TypeMismatch),
             }
         }};
@@ -59,6 +61,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
 
             match (left, right) {
                 (Type::I64, Type::I64) => Ok(Type::Boolean),
+                (Type::F64, Type::F64) => Ok(Type::Boolean),
                 _ => Err(Error::TypeMismatch),
             }
         }};
@@ -67,6 +70,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
     match expr {
         Expr::Boolean(_) => Ok(Type::Boolean),
         Expr::Integer(_) => Ok(Type::I64),
+        Expr::Float(_) => Ok(Type::F64),
         Expr::Identifier(name) => Ok(name_record(name, env)?.type_),
         Expr::Add(left, right) => tc_arithmetic!(left, right),
         Expr::Sub(left, right) => tc_arithmetic!(left, right),

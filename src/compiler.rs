@@ -16,7 +16,7 @@ fn find_lambda_captures_expr(
     }
 
     match expr {
-        Expr::Boolean(_) | Expr::Integer(_) => {}
+        Expr::Boolean(_) | Expr::Integer(_) | Expr::Float(_) => {}
         Expr::Identifier(id) => match current_scope.iter().rev().find(|&name| name == id) {
             Some(_) => {} // already exists in the **current** lexical scope
             None => {
@@ -196,6 +196,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
         Expr::Boolean(true) => String::from("    mov rax, 1"),
         Expr::Boolean(false) => String::from("    mov rax, 0"),
         Expr::Integer(number) => format!("    mov rax, {}", number),
+        Expr::Float(_number) => todo!(),
 
         // identifier
         Expr::Identifier(name) => format!("    mov rax, {}", name_location(name, env)),

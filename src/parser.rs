@@ -5,6 +5,7 @@ use std::fmt;
 pub enum Expr {
     Boolean(bool),
     Integer(i64),
+    Float(f64),
     Identifier(String),
     Add(Box<Expr>, Box<Expr>), // left, right
     Sub(Box<Expr>, Box<Expr>),
@@ -61,6 +62,46 @@ fn generate_lambda_id() -> u64 {
     id
 }
 
+fn parse_float(source: &String) -> Option<f64> {
+    let mut sign = 1f64;
+    let mut result = 0f64;
+    let mut chars = source.chars().peekable();
+
+    if let Some('-') = chars.peek() {
+        chars.next(); // consume `-`
+        sign = -1f64;
+    }
+
+    while let Some(ch) = chars.peek() {
+        match ch.to_digit(10) {
+            Some(number) => {
+                result = result * 10.0 + number as f64;
+                chars.next();
+            },
+            None => break,
+        }
+    }
+
+    if let Some('.') = chars.peek() {
+        chars.next(); // consume `.`
+    } else {
+        return None;
+    }
+
+    let mut fraction_digit = 10f64;
+    while let Some(ch) = chars.next() {
+        match ch.to_digit(10) {
+            Some(number) => {
+                result += (number as f64) / fraction_digit;
+                fraction_digit *= 10.0;
+            }
+            None => return None,
+        }
+    }
+
+    return Some(result * sign);
+}
+
 fn parse_integer(source: &String) -> Option<i64> {
     let mut sign = 1i64;
     let mut result = 0i64;
@@ -84,7 +125,7 @@ fn parse_integer(source: &String) -> Option<i64> {
     while let Some(ch) = chars.next() {
         match ch.to_digit(10) {
             Some(number) => result = result * 10 + number as i64,
-            None => break,
+            None => return None,
         }
     }
 
@@ -128,9 +169,7 @@ fn parse_parameters(sexprs: &Vec<SExpr>) -> Result<Vec<(String, Type)>, Error> {
     // check if it's a one parameter in the form: (<name> <type>)
     if sexprs.len() == 2 {
         match (&sexprs[0], &sexprs[1]) {
-            (Symbol(name), type_) => {
-                return Ok(vec![(name.to_owned(), parse_type(type_)?)])
-            },
+            (Symbol(name), type_) => return Ok(vec![(name.to_owned(), parse_type(type_)?)]),
             _ => {}
         }
     }
@@ -156,6 +195,9 @@ pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
         Symbol(symbol) => {
             if let Some(number) = parse_integer(&symbol) {
                 return Ok(Expr::Integer(number));
+            }
+            if let Some(number) = parse_float(&symbol) {
+                return Ok(Expr::Float(number));
             }
             if symbol == "true" {
                 return Ok(Expr::Boolean(true));
