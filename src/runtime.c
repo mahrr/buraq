@@ -3,9 +3,9 @@
 #include <stdio.h>
 
 // this is the entry function to buraq
-extern int boot() asm("boot");
+extern double boot() asm("boot");
 
 int main() {
-    printf("%d\n", boot());
+    printf("%g\n", boot());
     return 0;
 }

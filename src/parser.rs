@@ -154,6 +154,7 @@ fn parse_type(sexpr: &SExpr) -> Result<Type, Error> {
     match sexpr {
         // Literal Types
         SExpr::Symbol(keyword) if keyword == "i64" => Ok(Type::I64),
+        SExpr::Symbol(keyword) if keyword == "f64" => Ok(Type::F64),
         SExpr::Symbol(keyword) if keyword == "bool" => Ok(Type::Boolean),
         // Function Type
         SExpr::List(elements) => match &elements[..] {

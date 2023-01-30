@@ -154,6 +154,12 @@ fn generate_lambda_label(id: u64) -> String {
     format!("_lam_${}", id)
 }
 
+fn generate_f64_label(id: u64) -> String {
+    // this won't clash with any function names, since the symbol `$` is escaped
+    // in function labels
+    format!("_f64_${}", id)
+}
+
 // buraq identifiers are sequence of non-terminating characters, i.e., whitespace
 // characters or parentheses, these identifiers cannot be used as labels, instead
 // this function escapes the necessary characters them so that they could be used
@@ -196,7 +202,11 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
         ExprKind::Boolean(true) => String::from("    mov rax, 1"),
         ExprKind::Boolean(false) => String::from("    mov rax, 0"),
         ExprKind::Integer(number) => format!("    mov rax, {}", number),
-        ExprKind::Float(_number) => todo!(),
+        ExprKind::Float(_) => format!(
+            "    movsd xmm0, QWORD [{}]
+    movq rax, xmm0",
+            generate_f64_label(expr.id)
+        ),
 
         // identifier
         ExprKind::Identifier(name) => format!("    mov rax, {}", name_location(name, env)),
@@ -513,6 +523,84 @@ fn compile_defs(definitions: &Vec<Def>, env: &mut Vec<(String, Location)>) -> St
         .join("\n")
 }
 
+fn compile_expr_data(expr: &Expr) -> String {
+    use ExprKind::*;
+
+    match &expr.kind {
+        Float(number) => format!("{}:\n    dq {}", generate_f64_label(expr.id), number),
+        Add(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
+        Sub(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
+        Mul(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
+        Div(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
+        LT(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
+        GT(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
+        LE(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
+        GE(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
+        EQ(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
+        If(cond, then, else_) => format!(
+            "{}\n{}\n{}",
+            compile_expr_data(cond),
+            compile_expr_data(then),
+            compile_expr_data(else_)
+        ),
+        Cond(clauses, else_) => {
+            let mut clauses_data = String::new();
+            for (test, form) in clauses {
+                clauses_data.push_str(&format!(
+                    "{}\n{}\n",
+                    compile_expr_data(test),
+                    compile_expr_data(form)
+                ));
+            }
+            format!("{}{}", clauses_data, compile_expr_data(else_))
+        }
+        While(cond, body) => format!("{}\n{}", compile_expr_data(cond), compile_expr_data(body)),
+        Let(values, body) => {
+            let mut values_data = String::new();
+            for (_, value) in values {
+                values_data.push_str(&compile_expr_data(value));
+                values_data.push('\n');
+            }
+            format!("{}{}", values_data, compile_expr_data(body))
+        }
+        Set(_, value) => compile_expr_data(value),
+        Seq(first, rest) => {
+            let mut data = compile_expr_data(first);
+            for expr in rest {
+                data.push('\n');
+                data.push_str(&compile_expr_data(expr));
+            }
+            data
+        }
+        Lambda(_, _, body, _) => compile_expr_data(body),
+        App(function, arguments) => {
+            let mut data = compile_expr_data(function);
+            for argument in arguments {
+                data.push('\n');
+                data.push_str(&compile_expr_data(argument));
+            }
+            data
+        }
+        _ => String::new(),
+    }
+}
+
+fn compile_data(prog: &Prog) -> String {
+    let mut result = String::new();
+
+    for def in &prog.definitions {
+        match def {
+            Def::Fn(_, _, _, body) => {
+                result.push_str(&compile_expr_data(&body));
+                result.push('\n');
+            }
+        }
+    }
+
+    result.push_str(&compile_expr_data(&prog.expression));
+    return result;
+}
+
 pub fn compile(prog: &Prog) -> String {
     // construct the initial environment from the global definitions
     let mut env: Vec<(String, Location)> = prog
@@ -524,12 +612,16 @@ pub fn compile(prog: &Prog) -> String {
         .collect();
 
     format!(
-        "    section .text
+        "    section .data
+{}
+
+    section .text
     global boot
 {}
 boot:
 {}
     ret",
+        compile_data(&prog),
         compile_defs(&prog.definitions, &mut env),
         compile_expr(&prog.expression, 1, &mut env)
     )
