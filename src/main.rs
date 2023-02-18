@@ -45,14 +45,14 @@ fn main() {
     };
 
     // type check the parsed Buraq program
-    match type_checker::check(&prog) {
-        Ok(_) => (),
+    let exprs_types = match type_checker::check(&prog) {
+        Ok(exprs_types) => exprs_types,
         Err(error) => {
             eprintln!("error: {error}");
             process::exit(1);
         }
-    }
+    };
 
     // compile the program and dump the result to stdout
-    println!("{}", compiler::compile(&prog));
+    println!("{}", compiler::compile(&prog, &exprs_types));
 }

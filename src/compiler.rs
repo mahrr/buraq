@@ -1,4 +1,7 @@
-use crate::parser::{Def, Expr, ExprKind, Prog};
+use crate::{
+    parser::{Def, Expr, ExprKind, Prog},
+    type_checker::{Type, TypeMap},
+};
 
 // Semantic Analysis (currently only to set lambda captures)
 
@@ -190,10 +193,15 @@ fn name_location(name: &String, env: &Vec<(String, Location)>) -> String {
     }
 }
 
-fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>) -> String {
+fn compile_expr(
+    expr: &Expr,
+    stack_index: u32,
+    env: &mut Vec<(String, Location)>,
+    exprs_types: &TypeMap,
+) -> String {
     macro_rules! compile_expr {
         ($e:expr) => {
-            compile_expr($e, stack_index, env)
+            compile_expr($e, stack_index, env, exprs_types)
         };
     }
 
@@ -213,59 +221,113 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
 
         // arithmetics
         ExprKind::Add(left, right) => {
-            let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index + 1, env);
-            format!(
-                "{left}
-    mov {0}, rax
-{right}
-    add rax, {0}",
-                stack_location(stack_index)
-            )
+            let left = compile_expr(left, stack_index, env, exprs_types);
+            let right = compile_expr(right, stack_index + 1, env, exprs_types);
+            let left_stack_location = stack_location(stack_index);
+            let operands = format!("{left}\n    mov {0}, rax\n{right}", left_stack_location);
+
+            match exprs_types.get(&expr.id) {
+                Some(Type::I64) => {
+                    format!("{operands}\n    add rax, {0}", left_stack_location)
+                }
+                Some(Type::F64) => {
+                    format!(
+                        "{operands}
+    movq xmm0, rax
+    addsd xmm0, QWORD {0}
+    movq rax, xmm0",
+                        left_stack_location
+                    )
+                }
+                _ => unreachable!(),
+            }
         }
         ExprKind::Sub(left, right) => {
-            let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index + 1, env);
-            format!(
-                "{left}
-    mov {0}, rax
-{right}
+            let left = compile_expr(left, stack_index, env, exprs_types);
+            let right = compile_expr(right, stack_index + 1, env, exprs_types);
+            let left_stack_location = stack_location(stack_index);
+            let operands = format!("{left}\n    mov {0}, rax\n{right}", left_stack_location);
+
+            match exprs_types.get(&expr.id) {
+                Some(Type::I64) => {
+                    format!(
+                        "{operands}
     mov rdi, rax
     mov rax, {0}
     sub rax, rdi",
-                stack_location(stack_index)
-            )
+                        left_stack_location
+                    )
+                }
+                Some(Type::F64) => {
+                    format!(
+                        "{operands}
+    movsd xmm0, QWORD {0}
+    movq xmm1, rax
+    subsd xmm0, xmm1
+    movq rax, xmm0",
+                        left_stack_location
+                    )
+                }
+                _ => unreachable!(),
+            }
         }
         ExprKind::Mul(left, right) => {
-            let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index + 1, env);
-            format!(
-                "{left}
-    mov {0}, rax
-{right}
-    imul QWORD {0}",
-                stack_location(stack_index)
-            )
+            let left = compile_expr(left, stack_index, env, exprs_types);
+            let right = compile_expr(right, stack_index + 1, env, exprs_types);
+            let left_stack_location = stack_location(stack_index);
+            let operands = format!("{left}\n    mov {0}, rax\n{right}", left_stack_location);
+
+            match exprs_types.get(&expr.id) {
+                Some(Type::I64) => {
+                    format!("{operands}\n    imul QWORD {0}", left_stack_location)
+                }
+                Some(Type::F64) => {
+                    format!(
+                        "{operands}
+    movq xmm0, rax
+    mulsd xmm0, QWORD {0}
+    movq rax, xmm0",
+                        left_stack_location
+                    )
+                }
+                _ => unreachable!(),
+            }
         }
         ExprKind::Div(left, right) => {
-            let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index + 1, env);
-            format!(
-                "{left}
-    mov {0}, rax
-{right}
+            let left = compile_expr(left, stack_index, env, exprs_types);
+            let right = compile_expr(right, stack_index + 1, env, exprs_types);
+            let left_stack_location = stack_location(stack_index);
+            let operands = format!("{left}\n    mov {0}, rax\n{right}", left_stack_location);
+
+            match exprs_types.get(&expr.id) {
+                Some(Type::I64) => {
+                    format!(
+                        "{operands}
     mov rdi, rax
     mov rax, {0}
     xor rdx, rdx
     idiv rdi",
-                stack_location(stack_index)
-            )
+                        left_stack_location
+                    )
+                }
+                Some(Type::F64) => {
+                    format!(
+                        "{operands}
+    movsd xmm0, QWORD {0}
+    movq xmm1, rax
+    divsd xmm0, xmm1
+    movq rax, xmm0",
+                        left_stack_location
+                    )
+                }
+                _ => unreachable!(),
+            }
         }
 
         // comparison
         ExprKind::LT(left, right) => {
-            let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index + 1, env);
+            let left = compile_expr(left, stack_index, env, exprs_types);
+            let right = compile_expr(right, stack_index + 1, env, exprs_types);
             format!(
                 "{left}
     mov {0}, rax
@@ -278,8 +340,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
             )
         }
         ExprKind::GT(left, right) => {
-            let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index + 1, env);
+            let left = compile_expr(left, stack_index, env, exprs_types);
+            let right = compile_expr(right, stack_index + 1, env, exprs_types);
             format!(
                 "{left}
     mov {0}, rax
@@ -292,8 +354,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
             )
         }
         ExprKind::LE(left, right) => {
-            let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index + 1, env);
+            let left = compile_expr(left, stack_index, env, exprs_types);
+            let right = compile_expr(right, stack_index + 1, env, exprs_types);
             format!(
                 "{left}
     mov {0}, rax
@@ -306,8 +368,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
             )
         }
         ExprKind::GE(left, right) => {
-            let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index + 1, env);
+            let left = compile_expr(left, stack_index, env, exprs_types);
+            let right = compile_expr(right, stack_index + 1, env, exprs_types);
             format!(
                 "{left}
     mov {0}, rax
@@ -320,8 +382,8 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
             )
         }
         ExprKind::EQ(left, right) => {
-            let left = compile_expr(left, stack_index, env);
-            let right = compile_expr(right, stack_index + 1, env);
+            let left = compile_expr(left, stack_index, env, exprs_types);
+            let right = compile_expr(right, stack_index + 1, env, exprs_types);
             format!(
                 "{left}
     mov {0}, rax
@@ -394,7 +456,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
             let mut stack_index = stack_index;
 
             for (name, value) in bindings {
-                let value = compile_expr(value, stack_index, env);
+                let value = compile_expr(value, stack_index, env, exprs_types);
 
                 bindings_ins.push_str(&value);
                 bindings_ins.push_str(&format!("\n    mov {}, rax\n", stack_location(stack_index)));
@@ -403,7 +465,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                 stack_index += 1;
             }
 
-            let body = compile_expr(body, stack_index, env);
+            let body = compile_expr(body, stack_index, env, exprs_types);
             env.truncate(previous_bindings_count);
 
             format!("{bindings_ins}{body}")
@@ -428,7 +490,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
 
             // +1, because the first entry on the stack is reserved for the return address
             let stack_index = parameters.len() as u32 + 1;
-            let body = compile_expr(body, stack_index, env);
+            let body = compile_expr(body, stack_index, env, exprs_types);
 
             env.truncate(previous_env_count);
             format!(
@@ -454,7 +516,7 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
                     let stack_index = stack_index + (i as u32) + 2;
                     format!(
                         "{0}\n    mov {1}, rax",
-                        compile_expr(arg, stack_index, env),
+                        compile_expr(arg, stack_index, env, exprs_types),
                         stack_location(stack_index)
                     )
                 })
@@ -486,8 +548,12 @@ fn compile_expr(expr: &Expr, stack_index: u32, env: &mut Vec<(String, Location)>
     }
 }
 
-fn compile_defs(definitions: &Vec<Def>, env: &mut Vec<(String, Location)>) -> String {
-    fn compile_def(def: &Def, env: &mut Vec<(String, Location)>) -> String {
+fn compile_defs(
+    definitions: &Vec<Def>,
+    env: &mut Vec<(String, Location)>,
+    exprs_types: &TypeMap,
+) -> String {
+    fn compile_def(def: &Def, env: &mut Vec<(String, Location)>, exprs_types: &TypeMap) -> String {
         // Frame:
         //  [ previous rsp value ]
         //  [ return address     ] <- current rsp
@@ -508,7 +574,7 @@ fn compile_defs(definitions: &Vec<Def>, env: &mut Vec<(String, Location)>) -> St
 
                 // +1, because the first entry on the stack is reserved for the return address
                 let stack_index = parameters.len() as u32 + 1;
-                let body = compile_expr(body, stack_index, env);
+                let body = compile_expr(body, stack_index, env, exprs_types);
 
                 env.truncate(previous_env_count);
                 format!("{}:\n{body}\n    ret", sanitize_function_name(name))
@@ -518,7 +584,7 @@ fn compile_defs(definitions: &Vec<Def>, env: &mut Vec<(String, Location)>) -> St
 
     definitions
         .iter()
-        .map(|def| compile_def(def, env))
+        .map(|def| compile_def(def, env, exprs_types))
         .collect::<Vec<String>>()
         .join("\n")
 }
@@ -527,7 +593,7 @@ fn compile_expr_data(expr: &Expr) -> String {
     use ExprKind::*;
 
     match &expr.kind {
-        Float(number) => format!("{}:\n    dq {}", generate_f64_label(expr.id), number),
+        Float(number) => format!("{}:\n    dq {:e}", generate_f64_label(expr.id), number),
         Add(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
         Sub(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
         Mul(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
@@ -601,7 +667,7 @@ fn compile_data(prog: &Prog) -> String {
     return result;
 }
 
-pub fn compile(prog: &Prog) -> String {
+pub fn compile(prog: &Prog, exprs_types: &TypeMap) -> String {
     // construct the initial environment from the global definitions
     let mut env: Vec<(String, Location)> = prog
         .definitions
@@ -622,7 +688,7 @@ boot:
 {}
     ret",
         compile_data(&prog),
-        compile_defs(&prog.definitions, &mut env),
-        compile_expr(&prog.expression, 1, &mut env)
+        compile_defs(&prog.definitions, &mut env, exprs_types),
+        compile_expr(&prog.expression, 1, &mut env, exprs_types)
     )
 }
