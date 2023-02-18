@@ -1,5 +1,5 @@
 use crate::parser::{Def, Expr, ExprKind, Prog};
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
@@ -26,6 +26,8 @@ pub enum Type {
     Fn(Vec<Type>, Box<Type>),
 }
 
+pub type TypeMap = HashMap<u64, Type>; // Expression ID -> Expression Type
+
 #[derive(Clone)]
 struct NameRecord {
     name: String,
@@ -40,15 +42,25 @@ fn name_record(name: &String, env: &Vec<NameRecord>) -> Result<NameRecord, Error
     }
 }
 
-fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
+fn check_expr(
+    expr: &Expr,
+    env: &mut Vec<NameRecord>,
+    exprs_types: &mut TypeMap,
+) -> Result<Type, Error> {
     macro_rules! tc_arithmetic {
         ($left:expr, $right:expr) => {{
-            let left = check_impl($left, env)?;
-            let right = check_impl($right, env)?;
+            let left = check_expr($left, env, exprs_types)?;
+            let right = check_expr($right, env, exprs_types)?;
 
             match (left, right) {
-                (Type::I64, Type::I64) => Ok(Type::I64),
-                (Type::F64, Type::F64) => Ok(Type::F64),
+                (Type::I64, Type::I64) => {
+                    exprs_types.insert(expr.id, Type::I64);
+                    Ok(Type::I64)
+                }
+                (Type::F64, Type::F64) => {
+                    exprs_types.insert(expr.id, Type::F64);
+                    Ok(Type::F64)
+                }
                 _ => Err(Error::TypeMismatch),
             }
         }};
@@ -56,8 +68,8 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
 
     macro_rules! tc_comparison {
         ($left:expr, $right:expr) => {{
-            let left = check_impl($left, env)?;
-            let right = check_impl($right, env)?;
+            let left = check_expr($left, env, exprs_types)?;
+            let right = check_expr($right, env, exprs_types)?;
 
             match (left, right) {
                 (Type::I64, Type::I64) => Ok(Type::Boolean),
@@ -82,9 +94,9 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
         ExprKind::GE(left, right) => tc_comparison!(left, right),
         ExprKind::EQ(left, right) => tc_comparison!(left, right),
         ExprKind::If(cond, then, else_) => {
-            let cond = check_impl(cond, env)?;
-            let then = check_impl(then, env)?;
-            let else_ = check_impl(else_, env)?;
+            let cond = check_expr(cond, env, exprs_types)?;
+            let then = check_expr(then, env, exprs_types)?;
+            let else_ = check_expr(else_, env, exprs_types)?;
 
             if cond == Type::Boolean && then == else_ {
                 Ok(then)
@@ -93,13 +105,13 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
             }
         }
         ExprKind::Cond(clauses, last_clause) => {
-            let last_clause = check_impl(last_clause, env)?;
+            let last_clause = check_expr(last_clause, env, exprs_types)?;
 
             clauses
                 .iter()
                 .try_fold(last_clause, |last_clause, (test, form)| {
-                    let test = check_impl(test, env)?;
-                    let form = check_impl(form, env)?;
+                    let test = check_expr(test, env, exprs_types)?;
+                    let form = check_expr(form, env, exprs_types)?;
 
                     if test == Type::Boolean && form == last_clause {
                         Ok(last_clause)
@@ -109,8 +121,8 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
                 })
         }
         ExprKind::While(cond, body) => {
-            if check_impl(cond, env)? == Type::Boolean {
-                check_impl(body, env)
+            if check_expr(cond, env, exprs_types)? == Type::Boolean {
+                check_expr(body, env, exprs_types)
             } else {
                 Err(Error::TypeMismatch)
             }
@@ -121,19 +133,19 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
             for (name, value) in bindings {
                 let name_record = NameRecord {
                     name: name.to_owned(),
-                    type_: check_impl(value, env)?,
+                    type_: check_expr(value, env, exprs_types)?,
                     is_const: false,
                 };
                 env.push(name_record);
             }
 
-            let body = check_impl(body, env);
+            let body = check_expr(body, env, exprs_types);
             env.truncate(prev_bindings_count);
             body
         }
         ExprKind::Set(name, value) => {
             let record = name_record(name, env)?;
-            let value = check_impl(value, env)?;
+            let value = check_expr(value, env, exprs_types)?;
 
             if record.is_const {
                 Err(Error::AssignToConst(name.to_owned()))
@@ -145,7 +157,9 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
         }
         ExprKind::Seq(first, rest) => rest
             .iter()
-            .try_fold(check_impl(&first, env)?, |_, expr| check_impl(expr, env)),
+            .try_fold(check_expr(&first, env, exprs_types)?, |_, expr| {
+                check_expr(expr, env, exprs_types)
+            }),
         ExprKind::Lambda(parameters, return_type, body, _) => {
             let previous_env_count = env.len();
             for parameter in parameters {
@@ -156,7 +170,7 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
                 })
             }
 
-            let body_type = check_impl(&body, env)?;
+            let body_type = check_expr(&body, env, exprs_types)?;
             env.truncate(previous_env_count);
 
             if body_type == *return_type {
@@ -172,9 +186,9 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
             }
         }
         ExprKind::App(function, arguments) => {
-            let function = check_impl(&function, env)?;
+            let function = check_expr(&function, env, exprs_types)?;
             let arguments = arguments.iter().try_fold(vec![], |mut arguments, expr| {
-                arguments.push(check_impl(expr, env)?);
+                arguments.push(check_expr(expr, env, exprs_types)?);
                 Ok(arguments)
             })?;
 
@@ -186,7 +200,9 @@ fn check_impl(expr: &Expr, env: &mut Vec<NameRecord>) -> Result<Type, Error> {
     }
 }
 
-pub fn check(prog: &Prog) -> Result<Type, Error> {
+pub fn check(prog: &Prog) -> Result<TypeMap, Error> {
+    let mut exprs_types = HashMap::new();
+
     // build the initial type environment from the given definitions
     let mut env = prog
         .definitions
@@ -216,7 +232,7 @@ pub fn check(prog: &Prog) -> Result<Type, Error> {
                     })
                 }
 
-                let body_type = check_impl(&body, &mut env)?;
+                let body_type = check_expr(&body, &mut env, &mut exprs_types)?;
                 env.truncate(previous_env_count);
 
                 if body_type != *return_type {
@@ -227,5 +243,8 @@ pub fn check(prog: &Prog) -> Result<Type, Error> {
     }
 
     // type check the main expression
-    check_impl(&prog.expression, &mut env)
+    match check_expr(&prog.expression, &mut env, &mut exprs_types) {
+        Ok(_) => Ok(exprs_types),
+        Err(error) => Err(error),
+    }
 }
