@@ -72,8 +72,16 @@ fn check_expr(
             let right = check_expr($right, env, exprs_types)?;
 
             match (left, right) {
-                (Type::I64, Type::I64) => Ok(Type::Boolean),
-                (Type::F64, Type::F64) => Ok(Type::Boolean),
+                (Type::I64, Type::I64) => {
+                    exprs_types.insert($left.id, Type::I64);
+                    exprs_types.insert($right.id, Type::I64);
+                    Ok(Type::Boolean)
+                }
+                (Type::F64, Type::F64) => {
+                    exprs_types.insert($left.id, Type::F64);
+                    exprs_types.insert($right.id, Type::F64);
+                    Ok(Type::Boolean)
+                }
                 _ => Err(Error::TypeMismatch),
             }
         }};

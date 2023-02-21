@@ -224,19 +224,18 @@ fn compile_expr(
             let left = compile_expr(left, stack_index, env, exprs_types);
             let right = compile_expr(right, stack_index + 1, env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left}\n    mov {0}, rax\n{right}", left_stack_location);
+            let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
             match exprs_types.get(&expr.id) {
                 Some(Type::I64) => {
-                    format!("{operands}\n    add rax, {0}", left_stack_location)
+                    format!("{operands}\n    add rax, {left_stack_location}")
                 }
                 Some(Type::F64) => {
                     format!(
                         "{operands}
     movq xmm0, rax
-    addsd xmm0, QWORD {0}
-    movq rax, xmm0",
-                        left_stack_location
+    addsd xmm0, QWORD {left_stack_location}
+    movq rax, xmm0"
                     )
                 }
                 _ => unreachable!(),
@@ -246,26 +245,24 @@ fn compile_expr(
             let left = compile_expr(left, stack_index, env, exprs_types);
             let right = compile_expr(right, stack_index + 1, env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left}\n    mov {0}, rax\n{right}", left_stack_location);
+            let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
             match exprs_types.get(&expr.id) {
                 Some(Type::I64) => {
                     format!(
                         "{operands}
     mov rdi, rax
-    mov rax, {0}
-    sub rax, rdi",
-                        left_stack_location
+    mov rax, {left_stack_location}
+    sub rax, rdi"
                     )
                 }
                 Some(Type::F64) => {
                     format!(
                         "{operands}
-    movsd xmm0, QWORD {0}
+    movsd xmm0, QWORD {left_stack_location}
     movq xmm1, rax
     subsd xmm0, xmm1
-    movq rax, xmm0",
-                        left_stack_location
+    movq rax, xmm0"
                     )
                 }
                 _ => unreachable!(),
@@ -275,7 +272,7 @@ fn compile_expr(
             let left = compile_expr(left, stack_index, env, exprs_types);
             let right = compile_expr(right, stack_index + 1, env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left}\n    mov {0}, rax\n{right}", left_stack_location);
+            let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
             match exprs_types.get(&expr.id) {
                 Some(Type::I64) => {
@@ -285,9 +282,8 @@ fn compile_expr(
                     format!(
                         "{operands}
     movq xmm0, rax
-    mulsd xmm0, QWORD {0}
-    movq rax, xmm0",
-                        left_stack_location
+    mulsd xmm0, QWORD {left_stack_location}
+    movq rax, xmm0"
                     )
                 }
                 _ => unreachable!(),
@@ -297,27 +293,25 @@ fn compile_expr(
             let left = compile_expr(left, stack_index, env, exprs_types);
             let right = compile_expr(right, stack_index + 1, env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left}\n    mov {0}, rax\n{right}", left_stack_location);
+            let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
             match exprs_types.get(&expr.id) {
                 Some(Type::I64) => {
                     format!(
                         "{operands}
     mov rdi, rax
-    mov rax, {0}
+    mov rax, {left_stack_location}
     xor rdx, rdx
-    idiv rdi",
-                        left_stack_location
+    idiv rdi"
                     )
                 }
                 Some(Type::F64) => {
                     format!(
                         "{operands}
-    movsd xmm0, QWORD {0}
+    movsd xmm0, QWORD {left_stack_location}
     movq xmm1, rax
     divsd xmm0, xmm1
-    movq rax, xmm0",
-                        left_stack_location
+    movq rax, xmm0"
                     )
                 }
                 _ => unreachable!(),
@@ -326,74 +320,144 @@ fn compile_expr(
 
         // comparison
         ExprKind::LT(left, right) => {
-            let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + 1, env, exprs_types);
-            format!(
-                "{left}
-    mov {0}, rax
-{right}
-    mov rdi, {0}
+            let left_ins = compile_expr(left, stack_index, env, exprs_types);
+            let right_ins = compile_expr(right, stack_index + 1, env, exprs_types);
+            let left_stack_location = stack_location(stack_index);
+            let operands = format!("{left_ins}\n    mov {left_stack_location}, rax\n{right_ins}");
+
+            match (exprs_types.get(&left.id), exprs_types.get(&right.id)) {
+                (Some(Type::I64), Some(Type::I64)) => {
+                    format!(
+                        "{operands}
+    mov rdi, {left_stack_location}
     cmp rdi, rax
     setl al
-    movzx eax, al",
-                stack_location(stack_index)
-            )
+    movzx eax, al"
+                    )
+                }
+                (Some(Type::F64), Some(Type::F64)) => {
+                    format!(
+                        "{operands}
+    movq xmm0, rax
+    comisd xmm0, QWORD {left_stack_location}
+    seta al
+    movzx eax, al"
+                    )
+                }
+                _ => unreachable!(),
+            }
         }
         ExprKind::GT(left, right) => {
-            let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + 1, env, exprs_types);
-            format!(
-                "{left}
-    mov {0}, rax
-{right}
-    mov rdi, {0}
+            let left_ins = compile_expr(left, stack_index, env, exprs_types);
+            let right_ins = compile_expr(right, stack_index + 1, env, exprs_types);
+            let left_stack_location = stack_location(stack_index);
+            let operands = format!("{left_ins}\n    mov {left_stack_location}, rax\n{right_ins}");
+
+            match (exprs_types.get(&left.id), exprs_types.get(&right.id)) {
+                (Some(Type::I64), Some(Type::I64)) => {
+                    format!(
+                        "{operands}
+    mov rdi, {left_stack_location}
     cmp rdi, rax
     setg al
-    movzx eax, al",
-                stack_location(stack_index)
-            )
+    movzx eax, al"
+                    )
+                }
+                (Some(Type::F64), Some(Type::F64)) => {
+                    format!(
+                        "{operands}
+    movq xmm0, rax
+    comisd xmm0, QWORD {left_stack_location}
+    setb al
+    movzx eax, al"
+                    )
+                }
+                _ => unreachable!(),
+            }
         }
         ExprKind::LE(left, right) => {
-            let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + 1, env, exprs_types);
-            format!(
-                "{left}
-    mov {0}, rax
-{right}
-    mov rdi, {0}
+            let left_ins = compile_expr(left, stack_index, env, exprs_types);
+            let right_ins = compile_expr(right, stack_index + 1, env, exprs_types);
+            let left_stack_location = stack_location(stack_index);
+            let operands = format!("{left_ins}\n    mov {left_stack_location}, rax\n{right_ins}");
+
+            match (exprs_types.get(&left.id), exprs_types.get(&right.id)) {
+                (Some(Type::I64), Some(Type::I64)) => {
+                    format!(
+                        "{operands}
+    mov rdi, {left_stack_location}
     cmp rdi, rax
     setle al
-    movzx eax, al",
-                stack_location(stack_index)
-            )
+    movzx eax, al"
+                    )
+                }
+                (Some(Type::F64), Some(Type::F64)) => {
+                    format!(
+                        "{operands}
+    movq xmm0, rax
+    comisd xmm0, QWORD {left_stack_location}
+    setae al
+    movzx eax, al"
+                    )
+                }
+                _ => unreachable!(),
+            }
         }
         ExprKind::GE(left, right) => {
-            let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + 1, env, exprs_types);
-            format!(
-                "{left}
-    mov {0}, rax
-{right}
-    mov rdi, {0}
+            let left_ins = compile_expr(left, stack_index, env, exprs_types);
+            let right_ins = compile_expr(right, stack_index + 1, env, exprs_types);
+            let left_stack_location = stack_location(stack_index);
+            let operands = format!("{left_ins}\n    mov {left_stack_location}, rax\n{right_ins}");
+
+            match (exprs_types.get(&left.id), exprs_types.get(&right.id)) {
+                (Some(Type::I64), Some(Type::I64)) => {
+                    format!(
+                        "{operands}
+    mov rdi, {left_stack_location}
     cmp rdi, rax
-    setg al
-    movzx eax, al",
-                stack_location(stack_index)
-            )
+    setge al
+    movzx eax, al"
+                    )
+                }
+                (Some(Type::F64), Some(Type::F64)) => {
+                    format!(
+                        "{operands}
+    movq xmm0, rax
+    comisd xmm0, QWORD {left_stack_location}
+    setbe al
+    movzx eax, al"
+                    )
+                }
+                _ => unreachable!(),
+            }
         }
         ExprKind::EQ(left, right) => {
-            let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + 1, env, exprs_types);
-            format!(
-                "{left}
-    mov {0}, rax
-{right}
-    mov rdi, {0}
+            let left_ins = compile_expr(left, stack_index, env, exprs_types);
+            let right_ins = compile_expr(right, stack_index + 1, env, exprs_types);
+            let left_stack_location = stack_location(stack_index);
+            let operands = format!("{left_ins}\n    mov {left_stack_location}, rax\n{right_ins}");
+
+            match (exprs_types.get(&left.id), exprs_types.get(&right.id)) {
+                (Some(Type::I64), Some(Type::I64)) => {
+                    format!(
+                        "{operands}
+    mov rdi, {left_stack_location}
     cmp rdi, rax
     sete al
-    movzx eax, al",
-                stack_location(stack_index)
-            )
+    movzx eax, al"
+                    )
+                }
+                (Some(Type::F64), Some(Type::F64)) => {
+                    format!(
+                        "{operands}
+    movq xmm0, rax
+    comisd xmm0, QWORD {left_stack_location}
+    sete al
+    movzx eax, al"
+                    )
+                }
+                _ => unreachable!(),
+            }
         }
 
         // constructs
