@@ -657,18 +657,18 @@ fn compile_expr_data(expr: &Expr) -> String {
     use ExprKind::*;
 
     match &expr.kind {
-        Float(number) => format!("{}:\n    dq {:e}", generate_f64_label(expr.id), number),
-        Add(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
-        Sub(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
-        Mul(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
-        Div(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
-        LT(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
-        GT(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
-        LE(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
-        GE(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
-        EQ(left, right) => format!("{}\n{}", compile_expr_data(left), compile_expr_data(right)),
+        Float(number) => format!("{}:\n    dq {:e}\n", generate_f64_label(expr.id), number),
+        Add(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
+        Sub(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
+        Mul(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
+        Div(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
+        LT(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
+        GT(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
+        LE(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
+        GE(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
+        EQ(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
         If(cond, then, else_) => format!(
-            "{}\n{}\n{}",
+            "{}{}{}",
             compile_expr_data(cond),
             compile_expr_data(then),
             compile_expr_data(else_)
@@ -677,19 +677,18 @@ fn compile_expr_data(expr: &Expr) -> String {
             let mut clauses_data = String::new();
             for (test, form) in clauses {
                 clauses_data.push_str(&format!(
-                    "{}\n{}\n",
+                    "{}{}",
                     compile_expr_data(test),
                     compile_expr_data(form)
                 ));
             }
             format!("{}{}", clauses_data, compile_expr_data(else_))
         }
-        While(cond, body) => format!("{}\n{}", compile_expr_data(cond), compile_expr_data(body)),
+        While(cond, body) => format!("{}{}", compile_expr_data(cond), compile_expr_data(body)),
         Let(values, body) => {
             let mut values_data = String::new();
             for (_, value) in values {
                 values_data.push_str(&compile_expr_data(value));
-                values_data.push('\n');
             }
             format!("{}{}", values_data, compile_expr_data(body))
         }
@@ -697,7 +696,6 @@ fn compile_expr_data(expr: &Expr) -> String {
         Seq(first, rest) => {
             let mut data = compile_expr_data(first);
             for expr in rest {
-                data.push('\n');
                 data.push_str(&compile_expr_data(expr));
             }
             data
@@ -706,7 +704,6 @@ fn compile_expr_data(expr: &Expr) -> String {
         App(function, arguments) => {
             let mut data = compile_expr_data(function);
             for argument in arguments {
-                data.push('\n');
                 data.push_str(&compile_expr_data(argument));
             }
             data
@@ -720,10 +717,7 @@ fn compile_data(prog: &Prog) -> String {
 
     for def in &prog.definitions {
         match def {
-            Def::Fn(_, _, _, body) => {
-                result.push_str(&compile_expr_data(&body));
-                result.push('\n');
-            }
+            Def::Fn(_, _, _, body) => result.push_str(&compile_expr_data(&body))
         }
     }
 
@@ -744,7 +738,6 @@ pub fn compile(prog: &Prog, exprs_types: &TypeMap) -> String {
     format!(
         "    section .data
 {}
-
     section .text
     global boot
 {}
