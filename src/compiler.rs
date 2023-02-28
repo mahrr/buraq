@@ -571,13 +571,16 @@ fn compile_expr(
         ExprKind::App(function, arguments) => {
             let after_call_label = generate_distinct_label("after_call");
             let function = compile_expr!(function);
+
+            // even stack index is not 16-bytes aligned, since `rsp -= (stack_index + 1) * 8`
+            let stack_needs_align = stack_index & 0x1 == 0x0;
             let arguments = arguments
                 .iter()
                 .enumerate()
                 .map(|(i, arg)| {
                     // +2, because the previous RSP and the return address are pushed
                     // into the stack before the called function arguments
-                    let stack_index = stack_index + (i as u32) + 2;
+                    let stack_index = stack_index + i as u32 + stack_needs_align as u32 + 2;
                     format!(
                         "{0}\n    mov {1}, rax",
                         compile_expr(arg, stack_index, env, exprs_types),
@@ -604,9 +607,9 @@ fn compile_expr(
 {after_call_label}:
     ; pop previous RSP
     mov rsp, [rsp]",
-                stack_location(stack_index),
-                stack_location(stack_index + 1),
-                (stack_index + 1) * 8 // return address slot
+                stack_location(stack_index + stack_needs_align as u32),
+                stack_location(stack_index + stack_needs_align as u32 + 1),
+                (stack_index + stack_needs_align as u32 + 1) * 8 // return address slot
             )
         }
     }
@@ -717,7 +720,7 @@ fn compile_data(prog: &Prog) -> String {
 
     for def in &prog.definitions {
         match def {
-            Def::Fn(_, _, _, body) => result.push_str(&compile_expr_data(&body))
+            Def::Fn(_, _, _, body) => result.push_str(&compile_expr_data(&body)),
         }
     }
 
@@ -742,7 +745,9 @@ pub fn compile(prog: &Prog, exprs_types: &TypeMap) -> String {
     global boot
 {}
 boot:
+    sub rsp, 8
 {}
+    add rsp, 8
     ret",
         compile_data(&prog),
         compile_defs(&prog.definitions, &mut env, exprs_types),
