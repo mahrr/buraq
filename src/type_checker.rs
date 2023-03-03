@@ -48,32 +48,22 @@ fn check_expr(
     env: &mut Vec<NameRecord>,
     exprs_types: &mut TypeMap,
 ) -> Result<Type, Error> {
+    macro_rules! T {
+        ($type_:expr) => {{
+            exprs_types.insert(expr.id, $type_.clone());
+            Ok($type_)
+        }};
+    }
+
     macro_rules! tc_arithmetic {
         ($left:expr, $right:expr) => {{
             let left = check_expr($left, env, exprs_types)?;
             let right = check_expr($right, env, exprs_types)?;
 
             match (left, right) {
-                (Type::I8, Type::I8) => {
-                    exprs_types.insert(expr.id, Type::I8);
-                    Ok(Type::I8)
-                }
-                (Type::I64, Type::I8) => {
-                    exprs_types.insert(expr.id, Type::I64);
-                    Ok(Type::I64)
-                }
-                (Type::I8, Type::I64) => {
-                    exprs_types.insert(expr.id, Type::I64);
-                    Ok(Type::I64)
-                }
-                (Type::I64, Type::I64) => {
-                    exprs_types.insert(expr.id, Type::I64);
-                    Ok(Type::I64)
-                }
-                (Type::F64, Type::F64) => {
-                    exprs_types.insert(expr.id, Type::F64);
-                    Ok(Type::F64)
-                }
+                (Type::I8, Type::I8) => T!(Type::I8),
+                (Type::I64, Type::I64) => T!(Type::I64),
+                (Type::F64, Type::F64) => T!(Type::F64),
                 _ => Err(Error::TypeMismatch),
             }
         }};
@@ -85,20 +75,8 @@ fn check_expr(
             let right = check_expr($right, env, exprs_types)?;
 
             match (left, right) {
-                (Type::I8, Type::I8) => {
-                    exprs_types.insert($left.id, Type::I8);
-                    exprs_types.insert($right.id, Type::I8);
-                    Ok(Type::Boolean)
-                }
-                (Type::I64, Type::I64) => {
-                    exprs_types.insert($left.id, Type::I64);
-                    exprs_types.insert($right.id, Type::I64);
-                    Ok(Type::Boolean)
-                }
-                (Type::F64, Type::F64) => {
-                    exprs_types.insert($left.id, Type::F64);
-                    exprs_types.insert($right.id, Type::F64);
-                    Ok(Type::Boolean)
+                (Type::I8, Type::I8) | (Type::I64, Type::I64) | (Type::F64, Type::F64) => {
+                    T!(Type::Boolean)
                 }
                 _ => Err(Error::TypeMismatch),
             }
@@ -106,11 +84,11 @@ fn check_expr(
     }
 
     match &expr.kind {
-        ExprKind::Boolean(_) => Ok(Type::Boolean),
-        ExprKind::Int8(_) => Ok(Type::I8),
-        ExprKind::Int64(_) => Ok(Type::I64),
-        ExprKind::Float64(_) => Ok(Type::F64),
-        ExprKind::Identifier(name) => Ok(name_record(name, env)?.type_),
+        ExprKind::Boolean(_) => T!(Type::Boolean),
+        ExprKind::Int8(_) => T!(Type::I8),
+        ExprKind::Int64(_) => T!(Type::I64),
+        ExprKind::Float64(_) => T!(Type::F64),
+        ExprKind::Identifier(name) => T!(name_record(name, env)?.type_),
         ExprKind::Add(left, right) => tc_arithmetic!(left, right),
         ExprKind::Sub(left, right) => tc_arithmetic!(left, right),
         ExprKind::Mul(left, right) => tc_arithmetic!(left, right),
@@ -126,7 +104,7 @@ fn check_expr(
             let else_ = check_expr(else_, env, exprs_types)?;
 
             if cond == Type::Boolean && then == else_ {
-                Ok(then)
+                T!(then)
             } else {
                 Err(Error::TypeMismatch)
             }
@@ -141,7 +119,7 @@ fn check_expr(
                     let form = check_expr(form, env, exprs_types)?;
 
                     if test == Type::Boolean && form == last_clause {
-                        Ok(last_clause)
+                        T!(last_clause)
                     } else {
                         Err(Error::TypeMismatch)
                     }
@@ -179,7 +157,7 @@ fn check_expr(
             } else if record.type_ != value {
                 Err(Error::TypeMismatch)
             } else {
-                Ok(record.type_)
+                T!(record.type_)
             }
         }
         ExprKind::Seq(first, rest) => rest
@@ -201,7 +179,7 @@ fn check_expr(
             env.truncate(previous_env_count);
 
             if body_type == *return_type {
-                Ok(Type::Fn(
+                T!(Type::Fn(
                     parameters
                         .iter()
                         .map(|(_, t)| t.clone())
@@ -220,7 +198,7 @@ fn check_expr(
             })?;
 
             match function {
-                Type::Fn(parameters, return_type) if arguments == parameters => Ok(*return_type),
+                Type::Fn(parameters, return_type) if arguments == parameters => T!(*return_type),
                 _ => Err(Error::TypeMismatch),
             }
         }

@@ -1,6 +1,5 @@
 use crate::sexpr::SExpr;
 use crate::type_checker::Type;
-use core::num;
 use std::fmt;
 
 pub enum ExprKind {
