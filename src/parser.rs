@@ -1,11 +1,13 @@
 use crate::sexpr::SExpr;
 use crate::type_checker::Type;
+use core::num;
 use std::fmt;
 
 pub enum ExprKind {
     Boolean(bool),
-    Integer(i64),
-    Float(f64),
+    Int8(i8),
+    Int64(i64),
+    Float64(f64),
     Identifier(String),
     Add(Box<Expr>, Box<Expr>), // left, right
     Sub(Box<Expr>, Box<Expr>),
@@ -107,9 +109,10 @@ fn parse_float(source: &String) -> Option<f64> {
     return Some(result * sign);
 }
 
-fn parse_integer(source: &String) -> Option<i64> {
+fn parse_integer(source: &String) -> Option<ExprKind> {
     let mut sign = 1i64;
     let mut result = 0i64;
+    let mut bit_size = 0i64; // 0 indicates no size (default to i64)
     let mut chars = source.chars().peekable();
 
     if let Some('-') = chars.peek() {
@@ -127,14 +130,31 @@ fn parse_integer(source: &String) -> Option<i64> {
         }
     };
 
+    // TODO: check overflow
+    let mut consuming_bit_size = false;
     while let Some(ch) = chars.next() {
+        if ch == 'i' {
+            consuming_bit_size = true;
+            continue;
+        }
+
         match ch.to_digit(10) {
-            Some(number) => result = result * 10 + number as i64,
+            Some(number) => {
+                if consuming_bit_size == false {
+                    result = result * 10 + number as i64;
+                } else {
+                    bit_size = bit_size * 10 + number as i64;
+                }
+            }
             None => return None,
         }
     }
 
-    return Some(result * sign);
+    match bit_size {
+        0 | 64 => Some(ExprKind::Int64(sign * result)),
+        8 => Some(ExprKind::Int8((sign * result) as i8)),
+        _ => None,
+    }
 }
 
 fn parse_type(sexpr: &SExpr) -> Result<Type, Error> {
@@ -153,6 +173,7 @@ fn parse_type(sexpr: &SExpr) -> Result<Type, Error> {
 
     match sexpr {
         // Literal Types
+        SExpr::Symbol(keyword) if keyword == "i8" => Ok(Type::I8),
         SExpr::Symbol(keyword) if keyword == "i64" => Ok(Type::I64),
         SExpr::Symbol(keyword) if keyword == "f64" => Ok(Type::F64),
         SExpr::Symbol(keyword) if keyword == "bool" => Ok(Type::Boolean),
@@ -208,11 +229,11 @@ pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
 
     match sexpr {
         Symbol(symbol) => {
-            if let Some(number) = parse_integer(&symbol) {
-                return E!(ExprKind::Integer(number));
+            if let Some(expr) = parse_integer(&symbol) {
+                return E!(expr);
             }
             if let Some(number) = parse_float(&symbol) {
-                return E!(ExprKind::Float(number));
+                return E!(ExprKind::Float64(number));
             }
             if symbol == "true" {
                 return E!(ExprKind::Boolean(true));

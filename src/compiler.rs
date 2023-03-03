@@ -19,7 +19,7 @@ fn find_lambda_captures_expr(
     }
 
     match &mut expr.kind {
-        ExprKind::Boolean(_) | ExprKind::Integer(_) | ExprKind::Float(_) => {}
+        ExprKind::Boolean(_) | ExprKind::Int8(_) | ExprKind::Int64(_) | ExprKind::Float64(_) => {}
         ExprKind::Identifier(id) => match current_scope.iter().rev().find(|&name| name == id) {
             Some(_) => {} // already exists in the **current** lexical scope
             None => {
@@ -207,10 +207,11 @@ fn compile_expr(
 
     match &expr.kind {
         // literals
-        ExprKind::Boolean(true) => String::from("    mov rax, 1"),
-        ExprKind::Boolean(false) => String::from("    mov rax, 0"),
-        ExprKind::Integer(number) => format!("    mov rax, {}", number),
-        ExprKind::Float(_) => format!(
+        ExprKind::Boolean(true) => String::from("    mov eax, 1"),
+        ExprKind::Boolean(false) => String::from("    mov eax, 0"),
+        ExprKind::Int8(_number) => todo!(),
+        ExprKind::Int64(number) => format!("    mov rax, {}", number),
+        ExprKind::Float64(_) => format!(
             "    movsd xmm0, QWORD [{}]
     movq rax, xmm0",
             generate_f64_label(expr.id)
@@ -660,7 +661,7 @@ fn compile_expr_data(expr: &Expr) -> String {
     use ExprKind::*;
 
     match &expr.kind {
-        Float(number) => format!("{}:\n    dq {:e}\n", generate_f64_label(expr.id), number),
+        Float64(number) => format!("{}:\n    dq {:e}\n", generate_f64_label(expr.id), number),
         Add(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
         Sub(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
         Mul(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),

@@ -20,6 +20,7 @@ impl fmt::Display for Error {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
+    I8,
     I64,
     F64,
     Boolean,
@@ -53,6 +54,18 @@ fn check_expr(
             let right = check_expr($right, env, exprs_types)?;
 
             match (left, right) {
+                (Type::I8, Type::I8) => {
+                    exprs_types.insert(expr.id, Type::I8);
+                    Ok(Type::I8)
+                }
+                (Type::I64, Type::I8) => {
+                    exprs_types.insert(expr.id, Type::I64);
+                    Ok(Type::I64)
+                }
+                (Type::I8, Type::I64) => {
+                    exprs_types.insert(expr.id, Type::I64);
+                    Ok(Type::I64)
+                }
                 (Type::I64, Type::I64) => {
                     exprs_types.insert(expr.id, Type::I64);
                     Ok(Type::I64)
@@ -72,6 +85,11 @@ fn check_expr(
             let right = check_expr($right, env, exprs_types)?;
 
             match (left, right) {
+                (Type::I8, Type::I8) => {
+                    exprs_types.insert($left.id, Type::I8);
+                    exprs_types.insert($right.id, Type::I8);
+                    Ok(Type::Boolean)
+                }
                 (Type::I64, Type::I64) => {
                     exprs_types.insert($left.id, Type::I64);
                     exprs_types.insert($right.id, Type::I64);
@@ -89,8 +107,9 @@ fn check_expr(
 
     match &expr.kind {
         ExprKind::Boolean(_) => Ok(Type::Boolean),
-        ExprKind::Integer(_) => Ok(Type::I64),
-        ExprKind::Float(_) => Ok(Type::F64),
+        ExprKind::Int8(_) => Ok(Type::I8),
+        ExprKind::Int64(_) => Ok(Type::I64),
+        ExprKind::Float64(_) => Ok(Type::F64),
         ExprKind::Identifier(name) => Ok(name_record(name, env)?.type_),
         ExprKind::Add(left, right) => tc_arithmetic!(left, right),
         ExprKind::Sub(left, right) => tc_arithmetic!(left, right),
