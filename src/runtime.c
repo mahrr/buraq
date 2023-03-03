@@ -1,11 +1,12 @@
 // Buraq Runtime
 
 #include <stdio.h>
+#include <stdint.h>
 
 // this is the entry function to buraq
-extern int boot() asm("boot");
+extern int64_t boot() asm("boot");
 
 int main() {
-    printf("%d\n", boot());
+    printf("%lld\n", boot());
     return 0;
 }

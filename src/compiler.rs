@@ -181,8 +181,20 @@ fn sanitize_function_name(name: &String) -> String {
     format!("_fn_{}", sanitized)
 }
 
+#[inline]
 fn stack_location(index: u32) -> String {
-    format!("[rsp - {}]", index * 8)
+    format!("[rsp - {}]", index)
+}
+
+#[inline]
+fn type_size(type_: &Type) -> u32 {
+    match type_ {
+        Type::I8 => 1,
+        Type::I64 => 8,
+        Type::F64 => 8,
+        Type::Boolean => 1,
+        Type::Fn(_, _) => 8,
+    }
 }
 
 fn name_location(name: &String, env: &Vec<(String, Location)>) -> String {
@@ -195,7 +207,7 @@ fn name_location(name: &String, env: &Vec<(String, Location)>) -> String {
 
 fn compile_expr(
     expr: &Expr,
-    stack_index: u32,
+    stack_index: u32, // bytes addressed
     env: &mut Vec<(String, Location)>,
     exprs_types: &TypeMap,
 ) -> String {
@@ -209,7 +221,7 @@ fn compile_expr(
         // literals
         ExprKind::Boolean(true) => String::from("    mov eax, 1"),
         ExprKind::Boolean(false) => String::from("    mov eax, 0"),
-        ExprKind::Int8(_number) => todo!(),
+        ExprKind::Int8(number) => format!("    mov eax, {}", number),
         ExprKind::Int64(number) => format!("    mov rax, {}", number),
         ExprKind::Float64(_) => format!(
             "    movsd xmm0, QWORD [{}]
@@ -222,16 +234,24 @@ fn compile_expr(
 
         // arithmetics
         ExprKind::Add(left, right) => {
+            let expr_type = exprs_types.get(&expr.id).unwrap();
             let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + 1, env, exprs_types);
+            let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
             let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
-            match exprs_types.get(&expr.id) {
-                Some(Type::I64) => {
+            match expr_type {
+                Type::I8 => {
+                    format!(
+                        "{operands}
+    add al, {left_stack_location}
+    movsx rax, al"
+                    )
+                }
+                Type::I64 => {
                     format!("{operands}\n    add rax, {left_stack_location}")
                 }
-                Some(Type::F64) => {
+                Type::F64 => {
                     format!(
                         "{operands}
     movq xmm0, rax
@@ -243,13 +263,22 @@ fn compile_expr(
             }
         }
         ExprKind::Sub(left, right) => {
+            let expr_type = exprs_types.get(&expr.id).unwrap();
             let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + 1, env, exprs_types);
+            let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
             let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
-            match exprs_types.get(&expr.id) {
-                Some(Type::I64) => {
+            match expr_type {
+                Type::I8 => {
+                    format!("{operands}
+    mov ebx, eax
+    mov al, BYTE {left_stack_location}
+    sub al, bl
+    movsx rax, al"
+                    )
+                }
+                Type::I64 => {
                     format!(
                         "{operands}
     mov rdi, rax
@@ -257,7 +286,7 @@ fn compile_expr(
     sub rax, rdi"
                     )
                 }
-                Some(Type::F64) => {
+                Type::F64 => {
                     format!(
                         "{operands}
     movsd xmm0, QWORD {left_stack_location}
@@ -270,16 +299,24 @@ fn compile_expr(
             }
         }
         ExprKind::Mul(left, right) => {
+            let expr_type = exprs_types.get(&expr.id).unwrap();
             let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + 1, env, exprs_types);
+            let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
             let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
-            match exprs_types.get(&expr.id) {
-                Some(Type::I64) => {
-                    format!("{operands}\n    imul QWORD {0}", left_stack_location)
+            match expr_type {
+                Type::I8 => {
+                    format!(
+                        "{operands}
+    imul BYTE {left_stack_location}
+    movsx rax, al"
+                    )
                 }
-                Some(Type::F64) => {
+                Type::I64 => {
+                    format!("{operands}\n    imul QWORD {left_stack_location}")
+                }
+                Type::F64 => {
                     format!(
                         "{operands}
     movq xmm0, rax
@@ -291,22 +328,33 @@ fn compile_expr(
             }
         }
         ExprKind::Div(left, right) => {
+            let expr_type = exprs_types.get(&expr.id).unwrap();
             let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + 1, env, exprs_types);
+            let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
             let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
-            match exprs_types.get(&expr.id) {
-                Some(Type::I64) => {
+            match expr_type {
+                Type::I8 => {
+                    format!(
+                        "{operands}
+    mov ebx, eax
+    movsx eax, BYTE {left_stack_location}
+    cdq                                   ; edx = signbit(eax)
+    idiv ebx
+    movsx rax, al"
+                    )
+                }
+                Type::I64 => {
                     format!(
                         "{operands}
     mov rdi, rax
     mov rax, {left_stack_location}
-    xor rdx, rdx
+    cdq                                   ; edx = signbit(eax)
     idiv rdi"
                     )
                 }
-                Some(Type::F64) => {
+                Type::F64 => {
                     format!(
                         "{operands}
     movsd xmm0, QWORD {left_stack_location}
