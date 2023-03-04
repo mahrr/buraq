@@ -197,6 +197,15 @@ fn type_size(type_: &Type) -> u32 {
     }
 }
 
+#[inline]
+fn register_with_size(size_bytes: u32) -> &'static str {
+    match size_bytes {
+        1 => "al",
+        8 => "rax",
+        _ => unreachable!(),
+    }
+}
+
 fn name_location(name: &String, env: &Vec<(String, Location)>) -> String {
     match env.iter().rev().find(|(id, _)| name == id) {
         Some((_, Location::Index(index))) => stack_location(*index),
@@ -230,14 +239,25 @@ fn compile_expr(
         ),
 
         // identifier
-        ExprKind::Identifier(name) => format!("    mov rax, {}", name_location(name, env)),
+        ExprKind::Identifier(name) => {
+            let expr_type = exprs_types.get(&expr.id).unwrap();
+
+            match type_size(expr_type) {
+                1 => format!("    movzx rax, BYTE {}", name_location(name, env)),
+                8 => format!("    mov rax, {}", name_location(name, env)),
+                _ => unreachable!(),
+            }
+        }
 
         // arithmetics
         ExprKind::Add(left, right) => {
             let expr_type = exprs_types.get(&expr.id).unwrap();
-            let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
-            let left_stack_location = stack_location(stack_index);
+            let expr_size = type_size(expr_type);
+            let left_stack_index = stack_index + expr_size;
+
+            let left = compile_expr(left, left_stack_index, env, exprs_types);
+            let right = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left_stack_location = stack_location(left_stack_index);
 
             match expr_type {
                 Type::I8 => {
@@ -250,7 +270,8 @@ fn compile_expr(
                     )
                 }
                 Type::I64 => {
-                    format!("{left}
+                    format!(
+                        "{left}
     mov {left_stack_location}, rax
 {right}
     add rax, {left_stack_location}"
@@ -271,13 +292,17 @@ fn compile_expr(
         }
         ExprKind::Sub(left, right) => {
             let expr_type = exprs_types.get(&expr.id).unwrap();
-            let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
-            let left_stack_location = stack_location(stack_index);
+            let expr_size = type_size(expr_type);
+            let left_stack_index = stack_index + expr_size;
+
+            let left = compile_expr(left, left_stack_index, env, exprs_types);
+            let right = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left_stack_location = stack_location(left_stack_index);
 
             match expr_type {
                 Type::I8 => {
-                    format!("{left}
+                    format!(
+                        "{left}
     mov {left_stack_location}, al
 {right}
     mov ebx, eax
@@ -312,9 +337,12 @@ fn compile_expr(
         }
         ExprKind::Mul(left, right) => {
             let expr_type = exprs_types.get(&expr.id).unwrap();
-            let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
-            let left_stack_location = stack_location(stack_index);
+            let expr_size = type_size(expr_type);
+            let left_stack_index = stack_index + expr_size;
+
+            let left = compile_expr(left, left_stack_index, env, exprs_types);
+            let right = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left_stack_location = stack_location(left_stack_index);
 
             match expr_type {
                 Type::I8 => {
@@ -349,9 +377,12 @@ fn compile_expr(
         }
         ExprKind::Div(left, right) => {
             let expr_type = exprs_types.get(&expr.id).unwrap();
-            let left = compile_expr(left, stack_index, env, exprs_types);
-            let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
-            let left_stack_location = stack_location(stack_index);
+            let expr_size = type_size(expr_type);
+            let left_stack_index = stack_index + expr_size;
+
+            let left = compile_expr(left, left_stack_index, env, exprs_types);
+            let right = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left_stack_location = stack_location(left_stack_index);
 
             match expr_type {
                 Type::I8 => {
@@ -394,12 +425,15 @@ fn compile_expr(
 
         // comparison
         ExprKind::LT(left, right) => {
-            let left_type = exprs_types.get(&left.id).unwrap();
-            let left_ins = compile_expr(left, stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, stack_index + type_size(left_type), env, exprs_types);
-            let left_stack_location = stack_location(stack_index);
+            let expr_type = exprs_types.get(&expr.id).unwrap();
+            let expr_size = type_size(expr_type);
+            let left_stack_index = stack_index + expr_size;
 
-            match left_type {
+            let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
+            let right_ins = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left_stack_location = stack_location(left_stack_index);
+
+            match expr_type {
                 Type::I8 => {
                     format!(
                         "{left_ins}
@@ -435,12 +469,15 @@ fn compile_expr(
             }
         }
         ExprKind::GT(left, right) => {
-            let left_type = exprs_types.get(&left.id).unwrap();
-            let left_ins = compile_expr(left, stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, stack_index + type_size(left_type), env, exprs_types);
-            let left_stack_location = stack_location(stack_index);
+            let expr_type = exprs_types.get(&expr.id).unwrap();
+            let expr_size = type_size(expr_type);
+            let left_stack_index = stack_index + expr_size;
 
-            match left_type {
+            let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
+            let right_ins = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left_stack_location = stack_location(left_stack_index);
+
+            match expr_type {
                 Type::I8 => {
                     format!(
                         "{left_ins}
@@ -476,12 +513,15 @@ fn compile_expr(
             }
         }
         ExprKind::LE(left, right) => {
-            let left_type = exprs_types.get(&left.id).unwrap();
-            let left_ins = compile_expr(left, stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, stack_index + type_size(left_type), env, exprs_types);
-            let left_stack_location = stack_location(stack_index);
+            let expr_type = exprs_types.get(&expr.id).unwrap();
+            let expr_size = type_size(expr_type);
+            let left_stack_index = stack_index + expr_size;
 
-            match left_type {
+            let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
+            let right_ins = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left_stack_location = stack_location(left_stack_index);
+
+            match expr_type {
                 Type::I8 => {
                     format!(
                         "{left_ins}
@@ -517,12 +557,15 @@ fn compile_expr(
             }
         }
         ExprKind::GE(left, right) => {
-            let left_type = exprs_types.get(&left.id).unwrap();
-            let left_ins = compile_expr(left, stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, stack_index + type_size(left_type), env, exprs_types);
-            let left_stack_location = stack_location(stack_index);
+            let expr_type = exprs_types.get(&expr.id).unwrap();
+            let expr_size = type_size(expr_type);
+            let left_stack_index = stack_index + expr_size;
 
-            match left_type {
+            let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
+            let right_ins = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left_stack_location = stack_location(left_stack_index);
+
+            match expr_type {
                 Type::I8 => {
                     format!(
                         "{left_ins}
@@ -558,12 +601,15 @@ fn compile_expr(
             }
         }
         ExprKind::EQ(left, right) => {
-            let left_type = exprs_types.get(&left.id).unwrap();
-            let left_ins = compile_expr(left, stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, stack_index + type_size(left_type), env, exprs_types);
-            let left_stack_location = stack_location(stack_index);
+            let expr_type = exprs_types.get(&expr.id).unwrap();
+            let expr_size = type_size(expr_type);
+            let left_stack_index = stack_index + expr_size;
 
-            match left_type {
+            let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
+            let right_ins = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left_stack_location = stack_location(left_stack_index);
+
+            match expr_type {
                 Type::I8 => {
                     format!(
                         "{left_ins}
@@ -659,13 +705,20 @@ fn compile_expr(
             let mut stack_index = stack_index;
 
             for (name, value) in bindings {
-                let value = compile_expr(value, stack_index, env, exprs_types);
+                let value_size = type_size(exprs_types.get(&value.id).unwrap());
 
-                bindings_ins.push_str(&value);
-                bindings_ins.push_str(&format!("\n    mov {}, rax\n", stack_location(stack_index)));
+                // pad the stack if it wasn't aligned to the current value size
+                stack_index += value_size;
+                stack_index = (stack_index as f32 / value_size as f32).ceil() as u32 * value_size;
+
+                bindings_ins.push_str(&compile_expr(value, stack_index, env, exprs_types));
+                bindings_ins.push_str(&format!(
+                    "\n    mov {}, {}\n",
+                    stack_location(stack_index),
+                    register_with_size(value_size)
+                ));
 
                 env.push((String::clone(name), Location::Index(stack_index)));
-                stack_index += 1;
             }
 
             let body = compile_expr(body, stack_index, env, exprs_types);
@@ -890,6 +943,6 @@ boot:
     ret",
         compile_data(&prog),
         compile_defs(&prog.definitions, &mut env, exprs_types),
-        compile_expr(&prog.expression, 1, &mut env, exprs_types)
+        compile_expr(&prog.expression, 0, &mut env, exprs_types)
     )
 }
