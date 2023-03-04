@@ -727,8 +727,13 @@ fn compile_expr(
             format!("{bindings_ins}{body}")
         }
         ExprKind::Set(name, value) => {
-            let value = compile_expr!(value);
-            format!("{value}\n    mov {}, rax", name_location(name, env))
+            let value_ins = compile_expr!(value);
+            let value_size = type_size(exprs_types.get(&value.id).unwrap());
+            format!(
+                "{value_ins}\n    mov {}, {}",
+                name_location(name, env),
+                register_with_size(value_size)
+            )
         }
         ExprKind::Seq(first, rest) => rest.iter().fold(compile_expr!(first), |output, expr| {
             format!("{output}\n{}", compile_expr!(expr))

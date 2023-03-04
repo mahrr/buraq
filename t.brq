@@ -8,4 +8,5 @@
       (z 24)
       (y 2i8)
       (f true))
-    f)
+    (seq (set e (- e 1i8))
+         e))
