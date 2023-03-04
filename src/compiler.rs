@@ -238,22 +238,29 @@ fn compile_expr(
             let left = compile_expr(left, stack_index, env, exprs_types);
             let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
             match expr_type {
                 Type::I8 => {
                     format!(
-                        "{operands}
+                        "{left}
+    mov {left_stack_location}, al
+{right}
     add al, {left_stack_location}
     movsx rax, al"
                     )
                 }
                 Type::I64 => {
-                    format!("{operands}\n    add rax, {left_stack_location}")
+                    format!("{left}
+    mov {left_stack_location}, rax
+{right}
+    add rax, {left_stack_location}"
+                    )
                 }
                 Type::F64 => {
                     format!(
-                        "{operands}
+                        "{left}
+    mov {left_stack_location}, rax
+{right}
     movq xmm0, rax
     addsd xmm0, QWORD {left_stack_location}
     movq rax, xmm0"
@@ -267,11 +274,12 @@ fn compile_expr(
             let left = compile_expr(left, stack_index, env, exprs_types);
             let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
             match expr_type {
                 Type::I8 => {
-                    format!("{operands}
+                    format!("{left}
+    mov {left_stack_location}, al
+{right}
     mov ebx, eax
     mov al, BYTE {left_stack_location}
     sub al, bl
@@ -280,7 +288,9 @@ fn compile_expr(
                 }
                 Type::I64 => {
                     format!(
-                        "{operands}
+                        "{left}
+    mov {left_stack_location}, rax
+{right}
     mov rdi, rax
     mov rax, {left_stack_location}
     sub rax, rdi"
@@ -288,7 +298,9 @@ fn compile_expr(
                 }
                 Type::F64 => {
                     format!(
-                        "{operands}
+                        "{left}
+    mov {left_stack_location}, rax
+{right}
     movsd xmm0, QWORD {left_stack_location}
     movq xmm1, rax
     subsd xmm0, xmm1
@@ -303,22 +315,30 @@ fn compile_expr(
             let left = compile_expr(left, stack_index, env, exprs_types);
             let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
             match expr_type {
                 Type::I8 => {
                     format!(
-                        "{operands}
+                        "{left}
+    mov {left_stack_location}, al
+{right}
     imul BYTE {left_stack_location}
     movsx rax, al"
                     )
                 }
                 Type::I64 => {
-                    format!("{operands}\n    imul QWORD {left_stack_location}")
+                    format!(
+                        "{left}
+    mov {left_stack_location}, rax
+{right}
+    imul QWORD {left_stack_location}"
+                    )
                 }
                 Type::F64 => {
                     format!(
-                        "{operands}
+                        "{left}
+    mov {left_stack_location}, rax
+{right}
     movq xmm0, rax
     mulsd xmm0, QWORD {left_stack_location}
     movq rax, xmm0"
@@ -332,12 +352,13 @@ fn compile_expr(
             let left = compile_expr(left, stack_index, env, exprs_types);
             let right = compile_expr(right, stack_index + type_size(expr_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left}\n    mov {left_stack_location}, rax\n{right}");
 
             match expr_type {
                 Type::I8 => {
                     format!(
-                        "{operands}
+                        "{left}
+    mov {left_stack_location}, al
+{right}
     mov ebx, eax
     movsx eax, BYTE {left_stack_location}
     cdq                                   ; edx = signbit(eax)
@@ -347,7 +368,9 @@ fn compile_expr(
                 }
                 Type::I64 => {
                     format!(
-                        "{operands}
+                        "{left}
+    mov {left_stack_location}, rax
+{right}
     mov rdi, rax
     mov rax, {left_stack_location}
     cdq                                   ; edx = signbit(eax)
@@ -356,7 +379,9 @@ fn compile_expr(
                 }
                 Type::F64 => {
                     format!(
-                        "{operands}
+                        "{left}
+    mov {left_stack_location}, rax
+{right}
     movsd xmm0, QWORD {left_stack_location}
     movq xmm1, rax
     divsd xmm0, xmm1
@@ -373,12 +398,13 @@ fn compile_expr(
             let left_ins = compile_expr(left, stack_index, env, exprs_types);
             let right_ins = compile_expr(right, stack_index + type_size(left_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left_ins}\n    mov {left_stack_location}, rax\n{right_ins}");
 
             match left_type {
                 Type::I8 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, al
+{right_ins}
     cmp al, {left_stack_location}
     setg al
     movzx rax, al"
@@ -386,7 +412,9 @@ fn compile_expr(
                 }
                 Type::I64 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, rax
+{right_ins}
     cmp rax, {left_stack_location}
     setg al
     movzx rax, al"
@@ -394,7 +422,9 @@ fn compile_expr(
                 }
                 Type::F64 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, rax
+{right_ins}
     movq xmm0, rax
     comisd xmm0, QWORD {left_stack_location}
     seta al
@@ -409,12 +439,13 @@ fn compile_expr(
             let left_ins = compile_expr(left, stack_index, env, exprs_types);
             let right_ins = compile_expr(right, stack_index + type_size(left_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left_ins}\n    mov {left_stack_location}, rax\n{right_ins}");
 
             match left_type {
                 Type::I8 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, al
+{right_ins}
     cmp al, {left_stack_location}
     setl al
     movzx rax, al"
@@ -422,7 +453,9 @@ fn compile_expr(
                 }
                 Type::I64 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, rax
+{right_ins}
     cmp rax, {left_stack_location}
     setl al
     movzx rax, al"
@@ -430,7 +463,9 @@ fn compile_expr(
                 }
                 Type::F64 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, rax
+{right_ins}
     movq xmm0, rax
     comisd xmm0, QWORD {left_stack_location}
     setb al
@@ -445,12 +480,13 @@ fn compile_expr(
             let left_ins = compile_expr(left, stack_index, env, exprs_types);
             let right_ins = compile_expr(right, stack_index + type_size(left_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left_ins}\n    mov {left_stack_location}, rax\n{right_ins}");
 
             match left_type {
                 Type::I8 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, al
+{right_ins}
     cmp al, {left_stack_location}
     setge al
     movzx rax, al"
@@ -458,7 +494,9 @@ fn compile_expr(
                 }
                 Type::I64 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, rax
+{right_ins}
     cmp rax, {left_stack_location}
     setge al
     movzx rax, al"
@@ -466,7 +504,9 @@ fn compile_expr(
                 }
                 Type::F64 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, rax
+{right_ins}
     movq xmm0, rax
     comisd xmm0, QWORD {left_stack_location}
     setae al
@@ -481,12 +521,13 @@ fn compile_expr(
             let left_ins = compile_expr(left, stack_index, env, exprs_types);
             let right_ins = compile_expr(right, stack_index + type_size(left_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left_ins}\n    mov {left_stack_location}, rax\n{right_ins}");
 
             match left_type {
                 Type::I8 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, al
+{right_ins}
     cmp al, {left_stack_location}
     setle al
     movzx rax, al"
@@ -494,7 +535,9 @@ fn compile_expr(
                 }
                 Type::I64 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, rax
+{right_ins}
     cmp rax, {left_stack_location}
     setle al
     movzx rax, al"
@@ -502,7 +545,9 @@ fn compile_expr(
                 }
                 Type::F64 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, rax
+{right_ins}
     movq xmm0, rax
     comisd xmm0, QWORD {left_stack_location}
     setbe al
@@ -517,12 +562,13 @@ fn compile_expr(
             let left_ins = compile_expr(left, stack_index, env, exprs_types);
             let right_ins = compile_expr(right, stack_index + type_size(left_type), env, exprs_types);
             let left_stack_location = stack_location(stack_index);
-            let operands = format!("{left_ins}\n    mov {left_stack_location}, rax\n{right_ins}");
 
             match left_type {
                 Type::I8 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, al
+{right_ins}
     cmp al, {left_stack_location}
     sete al
     movzx rax, al"
@@ -530,7 +576,9 @@ fn compile_expr(
                 }
                 Type::I64 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, rax
+{right_ins}
     cmp rax, {left_stack_location}
     sete al
     movzx rax, al"
@@ -538,7 +586,9 @@ fn compile_expr(
                 }
                 Type::F64 => {
                     format!(
-                        "{operands}
+                        "{left_ins}
+    mov {left_stack_location}, rax
+{right_ins}
     movq xmm0, rax
     comisd xmm0, QWORD {left_stack_location}
     sete al
