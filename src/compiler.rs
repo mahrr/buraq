@@ -746,15 +746,20 @@ fn compile_expr(
             let lambda_label = generate_lambda_label(expr.id);
             let after_lambda_label = generate_distinct_label("after_lambda");
             let previous_env_count = env.len();
+            let mut stack_index = 0i64;
 
-            // push the function parameters stack index into the environment
-            for i in 0..parameters.len() {
-                let entry = (parameters[i].0.to_owned(), Location::Index(i as i64 + 1));
-                env.push(entry)
+            // push the lambda parameters stack index into the environment
+            for (parameter_name, parameter_type) in parameters {
+                let parameter_size = type_size(parameter_type);
+
+                // pad the stack if it wasn't aligned to the current value size
+                stack_index += parameter_size;
+                stack_index =
+                    (stack_index as f64 / parameter_size as f64).ceil() as i64 * parameter_size;
+
+                env.push((parameter_name.to_owned(), Location::Index(stack_index)));
             }
 
-            // +1, because the first entry on the stack is reserved for the return address
-            let stack_index = parameters.len() as i64 + 1;
             let body = compile_expr(body, stack_index, env, exprs_types);
 
             env.truncate(previous_env_count);
@@ -959,7 +964,11 @@ pub fn compile(prog: &Prog, exprs_types: &TypeMap) -> String {
     global boot
 {}
 boot:
+    ; move rsp to 16-bytes aligned address
+    sub rsp, 8
 {}
+    ; rewind rsp
+    add rsp, 8
     ret",
         compile_data(&prog),
         compile_defs(&prog.definitions, &mut env, exprs_types),
