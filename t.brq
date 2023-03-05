@@ -1,12 +1,4 @@
-# (defn fib (n i64) i64
-#    (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))
+(defn fib (n i64) i64
+   (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))
 
-# (fib 40)
-
-(let ((x 1i8)
-      (e 3i8)
-      (z 24)
-      (y 2i8)
-      (f true))
-    (seq (set e (- e 1i8))
-         e))
+(fib 40)

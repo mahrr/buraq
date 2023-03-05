@@ -137,7 +137,7 @@ pub fn find_lambda_captures(prog: &mut Prog) {
 // Compiler
 
 enum Location {
-    Index(u32),    // index on the stack
+    Index(i64),    // index on the stack
     FunctionLabel, // label (pointer), indenitifed by the name
 }
 
@@ -182,12 +182,16 @@ fn sanitize_function_name(name: &String) -> String {
 }
 
 #[inline]
-fn stack_location(index: u32) -> String {
-    format!("[rsp - {}]", index)
+fn stack_location(index: i64) -> String {
+    if index < 0 {
+        format!("[rsp + {}]", -index)
+    } else {
+        format!("[rsp - {}]", index)
+    }
 }
 
 #[inline]
-fn type_size(type_: &Type) -> u32 {
+fn type_size(type_: &Type) -> i64 {
     match type_ {
         Type::I8 => 1,
         Type::I64 => 8,
@@ -198,7 +202,7 @@ fn type_size(type_: &Type) -> u32 {
 }
 
 #[inline]
-fn register_with_size(size_bytes: u32) -> &'static str {
+fn register_with_size(size_bytes: i64) -> &'static str {
     match size_bytes {
         1 => "al",
         8 => "rax",
@@ -216,7 +220,7 @@ fn name_location(name: &String, env: &Vec<(String, Location)>) -> String {
 
 fn compile_expr(
     expr: &Expr,
-    stack_index: u32, // bytes addressed
+    stack_index: i64, // bytes addressed
     env: &mut Vec<(String, Location)>,
     exprs_types: &TypeMap,
 ) -> String {
@@ -425,15 +429,15 @@ fn compile_expr(
 
         // comparison
         ExprKind::LT(left, right) => {
-            let expr_type = exprs_types.get(&expr.id).unwrap();
-            let expr_size = type_size(expr_type);
-            let left_stack_index = stack_index + expr_size;
+            let left_type = exprs_types.get(&left.id).unwrap();
+            let left_size = type_size(left_type);
+            let left_stack_index = stack_index + left_size;
 
             let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let right_ins = compile_expr(right, left_stack_index + left_size, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
-            match expr_type {
+            match left_type {
                 Type::I8 => {
                     format!(
                         "{left_ins}
@@ -469,15 +473,15 @@ fn compile_expr(
             }
         }
         ExprKind::GT(left, right) => {
-            let expr_type = exprs_types.get(&expr.id).unwrap();
-            let expr_size = type_size(expr_type);
-            let left_stack_index = stack_index + expr_size;
+            let left_type = exprs_types.get(&left.id).unwrap();
+            let left_size = type_size(left_type);
+            let left_stack_index = stack_index + left_size;
 
             let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let right_ins = compile_expr(right, left_stack_index + left_size, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
-            match expr_type {
+            match left_type {
                 Type::I8 => {
                     format!(
                         "{left_ins}
@@ -513,15 +517,15 @@ fn compile_expr(
             }
         }
         ExprKind::LE(left, right) => {
-            let expr_type = exprs_types.get(&expr.id).unwrap();
-            let expr_size = type_size(expr_type);
-            let left_stack_index = stack_index + expr_size;
+            let left_type = exprs_types.get(&left.id).unwrap();
+            let left_size = type_size(left_type);
+            let left_stack_index = stack_index + left_size;
 
             let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let right_ins = compile_expr(right, left_stack_index + left_size, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
-            match expr_type {
+            match left_type {
                 Type::I8 => {
                     format!(
                         "{left_ins}
@@ -557,15 +561,15 @@ fn compile_expr(
             }
         }
         ExprKind::GE(left, right) => {
-            let expr_type = exprs_types.get(&expr.id).unwrap();
-            let expr_size = type_size(expr_type);
-            let left_stack_index = stack_index + expr_size;
+            let left_type = exprs_types.get(&left.id).unwrap();
+            let left_size = type_size(left_type);
+            let left_stack_index = stack_index + left_size;
 
             let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let right_ins = compile_expr(right, left_stack_index + left_size, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
-            match expr_type {
+            match left_type {
                 Type::I8 => {
                     format!(
                         "{left_ins}
@@ -601,15 +605,15 @@ fn compile_expr(
             }
         }
         ExprKind::EQ(left, right) => {
-            let expr_type = exprs_types.get(&expr.id).unwrap();
-            let expr_size = type_size(expr_type);
-            let left_stack_index = stack_index + expr_size;
+            let left_type = exprs_types.get(&left.id).unwrap();
+            let left_size = type_size(left_type);
+            let left_stack_index = stack_index + left_size;
 
             let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let right_ins = compile_expr(right, left_stack_index + left_size, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
-            match expr_type {
+            match left_type {
                 Type::I8 => {
                     format!(
                         "{left_ins}
@@ -709,7 +713,7 @@ fn compile_expr(
 
                 // pad the stack if it wasn't aligned to the current value size
                 stack_index += value_size;
-                stack_index = (stack_index as f32 / value_size as f32).ceil() as u32 * value_size;
+                stack_index = (stack_index as f64 / value_size as f64).ceil() as i64 * value_size;
 
                 bindings_ins.push_str(&compile_expr(value, stack_index, env, exprs_types));
                 bindings_ins.push_str(&format!(
@@ -745,12 +749,12 @@ fn compile_expr(
 
             // push the function parameters stack index into the environment
             for i in 0..parameters.len() {
-                let entry = (parameters[i].0.to_owned(), Location::Index(i as u32 + 1));
+                let entry = (parameters[i].0.to_owned(), Location::Index(i as i64 + 1));
                 env.push(entry)
             }
 
             // +1, because the first entry on the stack is reserved for the return address
-            let stack_index = parameters.len() as u32 + 1;
+            let stack_index = parameters.len() as i64 + 1;
             let body = compile_expr(body, stack_index, env, exprs_types);
 
             env.truncate(previous_env_count);
@@ -766,47 +770,56 @@ fn compile_expr(
             )
         }
         ExprKind::App(function, arguments) => {
-            let after_call_label = generate_distinct_label("after_call");
             let function = compile_expr!(function);
+            let mut arguments_ins = String::new();
+            let mut stack_index = stack_index;
 
-            // even stack index is not 16-bytes aligned, since `rsp -= (stack_index + 1) * 8`
-            let stack_needs_align = stack_index & 0x1 == 0x0;
-            let arguments = arguments
-                .iter()
-                .enumerate()
-                .map(|(i, arg)| {
-                    // +2, because the previous RSP and the return address are pushed
-                    // into the stack before the called function arguments
-                    let stack_index = stack_index + i as u32 + stack_needs_align as u32 + 2;
-                    format!(
-                        "{0}\n    mov {1}, rax",
-                        compile_expr(arg, stack_index, env, exprs_types),
-                        stack_location(stack_index)
-                    )
-                })
-                .collect::<Vec<String>>()
-                .join("\n");
+            // the stack index needs to be 16-bytes aligned before the call
+            let stack_index_padded = (stack_index as f64 / 16.0).ceil() as i64 * 16;
+
+            // the padding + return address size
+            stack_index = stack_index_padded + 8;
+
+            for (i, argument) in arguments.iter().enumerate() {
+                let argument_size = type_size(exprs_types.get(&argument.id).unwrap());
+
+                // pad the stack if it wasn't aligned to the current value size
+                stack_index += argument_size;
+                stack_index =
+                    (stack_index as f64 / argument_size as f64).ceil() as i64 * argument_size;
+
+                let argument_ins = compile_expr(argument, stack_index, env, exprs_types);
+                arguments_ins.push_str(&format!(
+                    "{argument_ins}\n    mov {}, {}",
+                    stack_location(stack_index),
+                    register_with_size(argument_size)
+                ));
+
+                if i != arguments.len() - 1 {
+                    arguments_ins.push('\n');
+                }
+            }
+
+            let (stack_padding, stack_unpadding) = if stack_index_padded != 0 {
+                (
+                    format!("    ; pad rsp to 16-bytes aligned address\n    sub rsp, {stack_index_padded}"),
+                    format!("    ; unpad rsp\n    add rsp, {stack_index_padded}"),
+                )
+            } else {
+                (
+                    format!("    ; rsp is already 16-bytes aligned"),
+                    format!("    ; no need to unpad rsp"),
+                )
+            };
 
             format!(
                 "{function}
-    ; save function address
-    mov rcx, rax
-    ; push previous RSP
-    mov {0}, rsp
-    mov rax, {after_call_label}
-    ; save return address
-    mov {1}, rax
-{arguments}
-    ; move RSP to the caller frame
-    sub rsp, {2}
-    ; call the function
-    jmp rcx
-{after_call_label}:
-    ; pop previous RSP
-    mov rsp, [rsp]",
-                stack_location(stack_index + stack_needs_align as u32),
-                stack_location(stack_index + stack_needs_align as u32 + 1),
-                (stack_index + stack_needs_align as u32 + 1) * 8 // return address slot
+    ; save the function address
+    mov rbx, rax
+{arguments_ins}
+{stack_padding}
+    call rbx
+{stack_unpadding}"
             )
         }
     }
@@ -819,25 +832,29 @@ fn compile_defs(
 ) -> String {
     fn compile_def(def: &Def, env: &mut Vec<(String, Location)>, exprs_types: &TypeMap) -> String {
         // Frame:
-        //  [ previous rsp value ]
-        //  [ return address     ] <- current rsp
-        //                            (index++)
-        //  [ argument_1 (most left)  ]
+        //  [ possible padding        ]
+        //  [ return address          ] <- current rsp
+        //  [ argument 1 (most left)  ]
         //  | ...                     |
-        //  [ argument_N (most right) ] (index += N)
+        //  [ argument N (most right) ]
 
         match def {
             Def::Fn(name, parameters, _, body) => {
                 let previous_env_count = env.len();
+                let mut stack_index = 0i64;
 
                 // push the function parameters stack index into the environment
-                for i in 0..parameters.len() {
-                    let entry = (parameters[i].0.to_owned(), Location::Index(i as u32 + 1));
-                    env.push(entry)
+                for (parameter_name, parameter_type) in parameters {
+                    let parameter_size = type_size(parameter_type);
+
+                    // pad the stack if it wasn't aligned to the current value size
+                    stack_index += parameter_size;
+                    stack_index =
+                        (stack_index as f64 / parameter_size as f64).ceil() as i64 * parameter_size;
+
+                    env.push((parameter_name.to_owned(), Location::Index(stack_index)));
                 }
 
-                // +1, because the first entry on the stack is reserved for the return address
-                let stack_index = parameters.len() as u32 + 1;
                 let body = compile_expr(body, stack_index, env, exprs_types);
 
                 env.truncate(previous_env_count);
@@ -942,9 +959,7 @@ pub fn compile(prog: &Prog, exprs_types: &TypeMap) -> String {
     global boot
 {}
 boot:
-    sub rsp, 8
 {}
-    add rsp, 8
     ret",
         compile_data(&prog),
         compile_defs(&prog.definitions, &mut env, exprs_types),
