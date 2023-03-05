@@ -220,13 +220,14 @@ fn name_location(name: &String, env: &Vec<(String, Location)>) -> String {
 
 fn compile_expr(
     expr: &Expr,
-    stack_index: i64, // bytes addressed
+    stack_index: i64,    // bytes addressed
+    tail_position: bool, // the last expression to be evalutated in the current frame
     env: &mut Vec<(String, Location)>,
     exprs_types: &TypeMap,
 ) -> String {
     macro_rules! compile_expr {
-        ($e:expr) => {
-            compile_expr($e, stack_index, env, exprs_types)
+        ($e:expr, $tp:expr) => {
+            compile_expr($e, stack_index, $tp, env, exprs_types)
         };
     }
 
@@ -259,8 +260,8 @@ fn compile_expr(
             let expr_size = type_size(expr_type);
             let left_stack_index = stack_index + expr_size;
 
-            let left = compile_expr(left, left_stack_index, env, exprs_types);
-            let right = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left = compile_expr(left, left_stack_index, false, env, exprs_types);
+            let right = compile_expr(right, left_stack_index + expr_size, false, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
             match expr_type {
@@ -299,8 +300,8 @@ fn compile_expr(
             let expr_size = type_size(expr_type);
             let left_stack_index = stack_index + expr_size;
 
-            let left = compile_expr(left, left_stack_index, env, exprs_types);
-            let right = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left = compile_expr(left, left_stack_index, false, env, exprs_types);
+            let right = compile_expr(right, left_stack_index + expr_size, false, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
             match expr_type {
@@ -344,8 +345,8 @@ fn compile_expr(
             let expr_size = type_size(expr_type);
             let left_stack_index = stack_index + expr_size;
 
-            let left = compile_expr(left, left_stack_index, env, exprs_types);
-            let right = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left = compile_expr(left, left_stack_index, false, env, exprs_types);
+            let right = compile_expr(right, left_stack_index + expr_size, false, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
             match expr_type {
@@ -384,8 +385,8 @@ fn compile_expr(
             let expr_size = type_size(expr_type);
             let left_stack_index = stack_index + expr_size;
 
-            let left = compile_expr(left, left_stack_index, env, exprs_types);
-            let right = compile_expr(right, left_stack_index + expr_size, env, exprs_types);
+            let left = compile_expr(left, left_stack_index, false, env, exprs_types);
+            let right = compile_expr(right, left_stack_index + expr_size, false, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
             match expr_type {
@@ -433,8 +434,9 @@ fn compile_expr(
             let left_size = type_size(left_type);
             let left_stack_index = stack_index + left_size;
 
-            let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, left_stack_index + left_size, env, exprs_types);
+            let left_ins = compile_expr(left, left_stack_index, false, env, exprs_types);
+            let right_ins =
+                compile_expr(right, left_stack_index + left_size, false, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
             match left_type {
@@ -477,8 +479,9 @@ fn compile_expr(
             let left_size = type_size(left_type);
             let left_stack_index = stack_index + left_size;
 
-            let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, left_stack_index + left_size, env, exprs_types);
+            let left_ins = compile_expr(left, left_stack_index, false, env, exprs_types);
+            let right_ins =
+                compile_expr(right, left_stack_index + left_size, false, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
             match left_type {
@@ -521,8 +524,9 @@ fn compile_expr(
             let left_size = type_size(left_type);
             let left_stack_index = stack_index + left_size;
 
-            let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, left_stack_index + left_size, env, exprs_types);
+            let left_ins = compile_expr(left, left_stack_index, false, env, exprs_types);
+            let right_ins =
+                compile_expr(right, left_stack_index + left_size, false, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
             match left_type {
@@ -565,8 +569,9 @@ fn compile_expr(
             let left_size = type_size(left_type);
             let left_stack_index = stack_index + left_size;
 
-            let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, left_stack_index + left_size, env, exprs_types);
+            let left_ins = compile_expr(left, left_stack_index, false, env, exprs_types);
+            let right_ins =
+                compile_expr(right, left_stack_index + left_size, false, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
             match left_type {
@@ -609,8 +614,9 @@ fn compile_expr(
             let left_size = type_size(left_type);
             let left_stack_index = stack_index + left_size;
 
-            let left_ins = compile_expr(left, left_stack_index, env, exprs_types);
-            let right_ins = compile_expr(right, left_stack_index + left_size, env, exprs_types);
+            let left_ins = compile_expr(left, left_stack_index, false, env, exprs_types);
+            let right_ins =
+                compile_expr(right, left_stack_index + left_size, false, env, exprs_types);
             let left_stack_location = stack_location(left_stack_index);
 
             match left_type {
@@ -653,9 +659,9 @@ fn compile_expr(
         ExprKind::If(cond, then, else_) => {
             let else_label = generate_distinct_label("else");
             let end_label = generate_distinct_label("if_end");
-            let cond = compile_expr!(cond);
-            let then = compile_expr!(then);
-            let else_ = compile_expr!(else_);
+            let cond = compile_expr!(cond, false);
+            let then = compile_expr!(then, tail_position);
+            let else_ = compile_expr!(else_, tail_position);
             format!(
                 "{cond}
     cmp rax, 1
@@ -669,11 +675,11 @@ fn compile_expr(
         }
         ExprKind::Cond(clauses, last_clause) => {
             let cond_end_label = generate_distinct_label("cond_end");
-            let last_clause = compile_expr!(last_clause);
+            let last_clause = compile_expr!(last_clause, tail_position);
             let clauses = clauses.iter().fold(String::new(), |clauses, (test, form)| {
                 let clause_end_label = generate_distinct_label("clause_end");
-                let test = compile_expr!(test);
-                let form = compile_expr!(form);
+                let test = compile_expr!(test, false);
+                let form = compile_expr!(form, tail_position);
 
                 format!(
                     "{clauses}
@@ -690,8 +696,8 @@ fn compile_expr(
         ExprKind::While(cond, body) => {
             let start_label = generate_distinct_label("while_start");
             let exit_label = generate_distinct_label("while_exit");
-            let cond = compile_expr!(cond);
-            let body = compile_expr!(body);
+            let cond = compile_expr!(cond, false);
+            let body = compile_expr!(body, false);
             format!(
                 "{start_label}:
 {cond}
@@ -715,7 +721,7 @@ fn compile_expr(
                 stack_index += value_size;
                 stack_index = (stack_index as f64 / value_size as f64).ceil() as i64 * value_size;
 
-                bindings_ins.push_str(&compile_expr(value, stack_index, env, exprs_types));
+                bindings_ins.push_str(&compile_expr(value, stack_index, false, env, exprs_types));
                 bindings_ins.push_str(&format!(
                     "\n    mov {}, {}\n",
                     stack_location(stack_index),
@@ -725,13 +731,13 @@ fn compile_expr(
                 env.push((String::clone(name), Location::Index(stack_index)));
             }
 
-            let body = compile_expr(body, stack_index, env, exprs_types);
+            let body = compile_expr(body, stack_index, tail_position, env, exprs_types);
             env.truncate(previous_bindings_count);
 
             format!("{bindings_ins}{body}")
         }
         ExprKind::Set(name, value) => {
-            let value_ins = compile_expr!(value);
+            let value_ins = compile_expr!(value, false);
             let value_size = type_size(exprs_types.get(&value.id).unwrap());
             format!(
                 "{value_ins}\n    mov {}, {}",
@@ -739,9 +745,16 @@ fn compile_expr(
                 register_with_size(value_size)
             )
         }
-        ExprKind::Seq(first, rest) => rest.iter().fold(compile_expr!(first), |output, expr| {
-            format!("{output}\n{}", compile_expr!(expr))
-        }),
+        ExprKind::Seq(first, rest) => {
+            let mut seq_ins = compile_expr!(first, false);
+
+            for (i, expr) in rest.iter().enumerate() {
+                seq_ins.push('\n');
+                seq_ins.push_str(&compile_expr!(expr, tail_position && i == rest.len() - 1));
+            }
+
+            seq_ins
+        }
         ExprKind::Lambda(parameters, _, body, _captures) => {
             let lambda_label = generate_lambda_label(expr.id);
             let after_lambda_label = generate_distinct_label("after_lambda");
@@ -760,7 +773,8 @@ fn compile_expr(
                 env.push((parameter_name.to_owned(), Location::Index(stack_index)));
             }
 
-            let body = compile_expr(body, stack_index, env, exprs_types);
+            // functions body expression is always considered in tail position
+            let body = compile_expr(body, stack_index, true, env, exprs_types);
 
             env.truncate(previous_env_count);
             format!(
@@ -774,7 +788,8 @@ fn compile_expr(
     mov rax, {lambda_label}"
             )
         }
-        ExprKind::App(function, arguments) => {
+        // no-tail call
+        ExprKind::App(function, arguments) if tail_position == false => {
             let mut arguments_ins = String::new();
             let mut stack_index = stack_index;
 
@@ -792,7 +807,7 @@ fn compile_expr(
                 stack_index =
                     (stack_index as f64 / argument_size as f64).ceil() as i64 * argument_size;
 
-                let argument_ins = compile_expr(argument, stack_index, env, exprs_types);
+                let argument_ins = compile_expr(argument, stack_index, false, env, exprs_types);
                 arguments_ins.push_str(&format!(
                     "{argument_ins}\n    mov {}, {}",
                     stack_location(stack_index),
@@ -804,7 +819,7 @@ fn compile_expr(
                 }
             }
 
-            let function = compile_expr(function, stack_index, env, exprs_types);
+            let function = compile_expr(function, stack_index, false, env, exprs_types);
             let (stack_move, stack_rewind) = if stack_index_padded != 0 {
                 (
                     format!(
@@ -828,6 +843,10 @@ fn compile_expr(
     call rax
 {stack_rewind}"
             )
+        }
+        // tail call
+        ExprKind::App(_function, _arguments) => {
+            todo!();
         }
     }
 }
@@ -862,7 +881,8 @@ fn compile_defs(
                     env.push((parameter_name.to_owned(), Location::Index(stack_index)));
                 }
 
-                let body = compile_expr(body, stack_index, env, exprs_types);
+                // functions body expression is always considered in tail position
+                let body = compile_expr(body, stack_index, true, env, exprs_types);
 
                 env.truncate(previous_env_count);
                 format!("{}:\n{body}\n    ret", sanitize_function_name(name))
@@ -974,6 +994,6 @@ boot:
     ret",
         compile_data(&prog),
         compile_defs(&prog.definitions, &mut env, exprs_types),
-        compile_expr(&prog.expression, 0, &mut env, exprs_types)
+        compile_expr(&prog.expression, 0, false, &mut env, exprs_types)
     )
 }
