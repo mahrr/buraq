@@ -775,7 +775,6 @@ fn compile_expr(
             )
         }
         ExprKind::App(function, arguments) => {
-            let function = compile_expr!(function);
             let mut arguments_ins = String::new();
             let mut stack_index = stack_index;
 
@@ -805,26 +804,29 @@ fn compile_expr(
                 }
             }
 
-            let (stack_padding, stack_unpadding) = if stack_index_padded != 0 {
+            let function = compile_expr(function, stack_index, env, exprs_types);
+            let (stack_move, stack_rewind) = if stack_index_padded != 0 {
                 (
-                    format!("    ; pad rsp to 16-bytes aligned address\n    sub rsp, {stack_index_padded}"),
-                    format!("    ; unpad rsp\n    add rsp, {stack_index_padded}"),
+                    format!(
+                        "    ; move rsp to the callee frame\n    sub rsp, {stack_index_padded}"
+                    ),
+                    format!(
+                        "    ; rewind rsp to the current frame\n    add rsp, {stack_index_padded}"
+                    ),
                 )
             } else {
                 (
-                    format!("    ; rsp is already 16-bytes aligned"),
-                    format!("    ; no need to unpad rsp"),
+                    format!("    ; call will take care of moving rsp"),
+                    format!("    ; ret took care of rewinding rsp"),
                 )
             };
 
             format!(
-                "{function}
-    ; save the function address
-    mov rbx, rax
-{arguments_ins}
-{stack_padding}
-    call rbx
-{stack_unpadding}"
+                "{arguments_ins}
+{function}
+{stack_move}
+    call rax
+{stack_rewind}"
             )
         }
     }
@@ -967,7 +969,7 @@ boot:
     ; move rsp to 16-bytes aligned address
     sub rsp, 8
 {}
-    ; rewind rsp
+    ; rewind rsp 16-bytes alignment
     add rsp, 8
     ret",
         compile_data(&prog),
