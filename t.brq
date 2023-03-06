@@ -5,5 +5,12 @@
 #
 # (fib 40)
 
-(let ((inc (lam (n i64) i64 (+ n 1))))
-   (inc 99))
+# (let ((inc (lam (n i64) i64 (+ n 1))))
+#   (inc 99))
+
+(defn sum ((n i64) (acc i64)) i64
+   (if (<= n 0)
+       acc
+       (sum (- n 1) (+ n acc))))
+
+(sum 300000 0)

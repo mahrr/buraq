@@ -802,7 +802,7 @@ fn compile_expr(
             for (i, argument) in arguments.iter().enumerate() {
                 let argument_size = type_size(exprs_types.get(&argument.id).unwrap());
 
-                // pad the stack if it wasn't aligned to the current value size
+                // pad the stack if it wasn't aligned to the current argument size
                 stack_index += argument_size;
                 stack_index =
                     (stack_index as f64 / argument_size as f64).ceil() as i64 * argument_size;
@@ -845,8 +845,80 @@ fn compile_expr(
             )
         }
         // tail call
-        ExprKind::App(_function, _arguments) => {
-            todo!();
+        ExprKind::App(function, arguments) => {
+            //
+            // To achieve tail call, we simply need to push the arguments onto the
+            // start of the current frame, but first we push the arguments on the
+            // top of the stack then move it to the start of the current frame as
+            // arguments evaluation could reference an existing variable on the stack.
+            //
+            // This is the state of the frame before the move, assuming a function
+            // with three arguments a1, a2 and a3 is being called, and the current
+            // frame has two variables v1 and v2, and two arguments b1 and b2:
+            //
+            //               | a3 | a2 | a1 | v2 | v1 | b2 | b1 | ret_address
+            //   stack_idx ----^                          rsp ----^
+            //
+            // we need to shift a3, a2 and a1 like the following:
+            //
+            //               | a3 | a2 | a1 | v2 | a3 | a2 | a1 | ret_address
+            //                       stack_idx ----^      rsp ----^
+            //
+            // Note that in this case, we don't need to push any new address we just
+            // jump to the called function and it will return to the caller of the
+            // current function directly.
+            //
+
+            let mut arguments_push_ins = String::new();
+            let mut arguments_move_ins = String::new();
+
+            let mut stack_index = stack_index;
+            let mut frame_index = 0i64;
+
+            // the instructions to push the arguments onto current frame
+            // the instruction to move the arguments to the start of the frame
+            for (i, argument) in arguments.iter().enumerate() {
+                let argument_size = type_size(exprs_types.get(&argument.id).unwrap());
+
+                stack_index += argument_size;
+                frame_index += argument_size;
+
+                // pad the indices if they weren't aligned to the current argument size
+                stack_index =
+                    (stack_index as f64 / argument_size as f64).ceil() as i64 * argument_size;
+                frame_index =
+                    (frame_index as f64 / argument_size as f64).ceil() as i64 * argument_size;
+
+                let argument_ins = compile_expr(argument, stack_index, false, env, exprs_types);
+                arguments_push_ins.push_str(&format!(
+                    "{argument_ins}\n    mov {}, {}",
+                    stack_location(stack_index),
+                    register_with_size(argument_size)
+                ));
+
+                arguments_move_ins.push_str(&format!(
+                    "    ; move argument #{i} to beginning of the frame
+    mov rbx, {}
+    mov {}, rbx",
+                    stack_location(stack_index),
+                    stack_location(frame_index)
+                ));
+
+                if i != arguments.len() - 1 {
+                    arguments_push_ins.push('\n');
+                    arguments_move_ins.push('\n');
+                }
+            }
+
+            let function = compile_expr(function, stack_index, false, env, exprs_types);
+
+            format!(
+                "    ; tail call
+{arguments_push_ins}
+{arguments_move_ins}
+{function}
+    jmp rax"
+            )
         }
     }
 }
