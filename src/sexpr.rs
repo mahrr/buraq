@@ -26,8 +26,20 @@ fn consume_whitespace<I: Iterator<Item = char>>(it: &mut Peekable<I>) {
     while let Some(_) = it.next_if(|ch| ch.is_ascii_whitespace()) {}
 }
 
+fn consume_whitespace_and_comment<I: Iterator<Item = char>>(it: &mut Peekable<I>) {
+    loop {
+        match it.peek() {
+            Some('#') => while let Some(_) = it.next_if(|ch| *ch != '\n') {},
+            Some(ch) if ch.is_ascii_whitespace() => {
+                it.next();
+            }
+            _ => break,
+        }
+    }
+}
+
 fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Result<SExpr, Error> {
-    consume_whitespace(it);
+    consume_whitespace_and_comment(it);
 
     match it.peek() {
         Some('(') => {
@@ -42,10 +54,6 @@ fn parse_impl<I: Iterator<Item = char>>(it: &mut Peekable<I>) -> Result<SExpr, E
                 elements.push(parse_impl(it)?);
             }
             Ok(SExpr::List(elements))
-        }
-        Some('#') => {
-            while let Some(_) = it.next_if(|ch| *ch != '\n') {}
-            parse_impl(it)
         }
         Some(_) => {
             let mut symbol: String = String::new();
@@ -77,6 +85,8 @@ pub fn parse_multiple(source: &String) -> Result<Vec<SExpr>, Error> {
             Err(error) => return Err(error),
         }
 
+        consume_whitespace_and_comment(&mut it);
+
         if it.peek() == None {
             break;
         }
@@ -105,6 +115,12 @@ mod tests {
 
         let symbol = String::from("# this is comment\nfoo-bar");
         assert_eq!(parse(&symbol), Ok(SExpr::Symbol("foo-bar".to_string())));
+
+        let symbol = String::from("foo ");
+        assert_eq!(parse(&symbol), Ok(SExpr::Symbol("foo".to_string())));
+
+        let symbol = String::from("foo\n # this is comment");
+        assert_eq!(parse(&symbol), Ok(SExpr::Symbol("foo".to_string())));
 
         let list = String::from("()");
         assert_eq!(parse(&list), Ok(SExpr::List(vec![])));
@@ -157,6 +173,19 @@ mod tests {
         );
 
         let sexprs = String::from("(1) (2 3) 4");
+        assert_eq!(
+            parse_multiple(&sexprs),
+            Ok(vec![
+                SExpr::List(vec![SExpr::Symbol("1".to_string())]),
+                SExpr::List(vec![
+                    SExpr::Symbol("2".to_string()),
+                    SExpr::Symbol("3".to_string())
+                ]),
+                SExpr::Symbol("4".to_string())
+            ])
+        );
+
+        let sexprs = String::from("(1) (2 3) 4\n # comment");
         assert_eq!(
             parse_multiple(&sexprs),
             Ok(vec![
