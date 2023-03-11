@@ -2,6 +2,7 @@ use crate::sexpr::SExpr;
 use crate::type_checker::Type;
 use std::fmt;
 
+#[derive(Debug, PartialEq)]
 pub enum ExprKind {
     Boolean(bool),
     Int8(i8),
@@ -27,6 +28,7 @@ pub enum ExprKind {
     App(Box<Expr>, Vec<Expr>),                                 // function, arguments
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Expr {
     pub id: u64,
     pub kind: ExprKind,
@@ -41,7 +43,7 @@ pub struct Prog {
     pub expression: Expr,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     InvalidExpr,
     InvalidDef,
@@ -412,4 +414,38 @@ pub fn parse_prog(sexprs: &Vec<SExpr>) -> Result<Prog, Error> {
         expression: expression,
         definitions: definitions,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_expr_literals() {
+        fn assert_symbol(sym: &str, kind: ExprKind) {
+            let sexpr = SExpr::Symbol(sym.to_string());
+            let expr = parse_expr(&sexpr).unwrap();
+            assert_eq!(expr.kind, kind);
+        }
+
+        assert_symbol("true", ExprKind::Boolean(true));
+        assert_symbol("false", ExprKind::Boolean(false));
+
+        assert_symbol("25", ExprKind::Int64(25));
+        assert_symbol("25i8", ExprKind::Int8(25));
+        assert_symbol("25i64", ExprKind::Int64(25));
+        assert_symbol("-25", ExprKind::Int64(-25));
+        assert_symbol("-25i8", ExprKind::Int8(-25));
+        assert_symbol("-25i64", ExprKind::Int64(-25));
+        assert_symbol("25.0", ExprKind::Float64(25.0));
+        assert_symbol("25.", ExprKind::Float64(25.0));
+        assert_symbol("25.25", ExprKind::Float64(25.25));
+        assert_symbol("0.25", ExprKind::Float64(0.25));
+        assert_symbol(".25", ExprKind::Float64(0.25));
+        assert_symbol("-25.0", ExprKind::Float64(-25.0));
+        assert_symbol("-25.", ExprKind::Float64(-25.0));
+        assert_symbol("-25.25", ExprKind::Float64(-25.25));
+        assert_symbol("-0.25", ExprKind::Float64(-0.25));
+        assert_symbol("-.25", ExprKind::Float64(-0.25));
+    }
 }
