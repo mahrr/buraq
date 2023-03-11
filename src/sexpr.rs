@@ -161,7 +161,10 @@ mod tests {
                 SExpr::Symbol("foo".to_string()),
             ]))
         );
+    }
 
+    #[test]
+    fn test_parse_multiple() {
         let sexprs = String::from("1 2 3");
         assert_eq!(
             parse_multiple(&sexprs),
@@ -197,8 +200,10 @@ mod tests {
                 SExpr::Symbol("4".to_string())
             ])
         );
+    }
 
-        // invalid S-Expressions
+    #[test]
+    fn test_parse_invalid() {
         assert_eq!(parse(&String::from("")), Err(Error));
         assert_eq!(parse(&String::from(")foo bar)")), Err(Error));
         assert_eq!(parse(&String::from("(foo bar")), Err(Error));
