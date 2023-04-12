@@ -113,19 +113,27 @@ pub fn find_lambda_captures(prog: &mut Prog) {
         })
         .collect::<Vec<String>>();
 
-    prog.definitions.iter_mut().for_each(|def| match def {
-        Def::Fn(_, parameters, _, body) => {
-            let mut current_scope = vec![];
+    prog.definitions
+        .iter_mut()
+        .for_each(|mut def| match &mut def {
+            Def::Fn(_, parameters, _, body) => {
+                let mut current_scope = vec![];
 
-            // add parameters to the current lexical scope
-            for (name, _) in parameters {
-                current_scope.push(name.to_owned());
+                // add parameters to the current lexical scope
+                for (name, _) in parameters {
+                    current_scope.push(name.to_owned());
+                }
+
+                // analyse the body of the function
+                find_lambda_captures_expr(
+                    body,
+                    &global_definitions,
+                    &mut current_scope,
+                    &mut vec![],
+                );
             }
+        });
 
-            // analyse the body of the function
-            find_lambda_captures_expr(body, &global_definitions, &mut current_scope, &mut vec![]);
-        }
-    });
     find_lambda_captures_expr(
         &mut prog.expression,
         &global_definitions,
