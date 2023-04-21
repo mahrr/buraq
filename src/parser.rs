@@ -6,6 +6,7 @@ use std::fmt;
 pub enum ExprKind {
     Boolean(bool),
     Int8(i8),
+    Int16(i16),
     Int64(i64),
     Float64(f64),
     Identifier(String),
@@ -154,6 +155,7 @@ fn parse_integer(source: &String) -> Option<ExprKind> {
     match bit_size {
         0 | 64 => Some(ExprKind::Int64(sign * result)),
         8 => Some(ExprKind::Int8((sign * result) as i8)),
+        16 => Some(ExprKind::Int16((sign * result) as i16)),
         _ => None,
     }
 }

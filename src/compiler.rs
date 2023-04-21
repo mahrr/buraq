@@ -19,7 +19,11 @@ fn find_lambda_captures_expr(
     }
 
     match &mut expr.kind {
-        ExprKind::Boolean(_) | ExprKind::Int8(_) | ExprKind::Int64(_) | ExprKind::Float64(_) => {}
+        ExprKind::Boolean(_)
+        | ExprKind::Int8(_)
+        | ExprKind::Int16(_)
+        | ExprKind::Int64(_)
+        | ExprKind::Float64(_) => {}
         ExprKind::Identifier(id) => match current_scope.iter().rev().find(|&name| name == id) {
             Some(_) => {} // already exists in the **current** lexical scope
             None => {
@@ -198,14 +202,16 @@ fn stack_location(index: i64) -> String {
     }
 }
 
+// return the size in bytes of the given type
 #[inline]
 fn type_size(type_: &Type) -> i64 {
     match type_ {
         Type::I8 => 1,
+        Type::I16 => 2,
         Type::I64 => 8,
         Type::F64 => 8,
         Type::Boolean => 1,
-        Type::Fn(_, _) => 8,
+        Type::Fn(_, _) => 8, // functions are pointers
     }
 }
 
@@ -213,6 +219,7 @@ fn type_size(type_: &Type) -> i64 {
 fn register_with_size(size_bytes: i64) -> &'static str {
     match size_bytes {
         1 => "al",
+        2 => "ax",
         8 => "rax",
         _ => unreachable!(),
     }
@@ -244,6 +251,7 @@ fn compile_expr(
         ExprKind::Boolean(true) => String::from("    mov eax, 1"),
         ExprKind::Boolean(false) => String::from("    mov eax, 0"),
         ExprKind::Int8(number) => format!("    mov eax, {}", number),
+        ExprKind::Int16(number) => format!("    mov eax, {}", number),
         ExprKind::Int64(number) => format!("    mov rax, {}", number),
         ExprKind::Float64(_) => format!(
             "    movsd xmm0, QWORD [{}]
@@ -257,6 +265,7 @@ fn compile_expr(
 
             match type_size(expr_type) {
                 1 => format!("    movzx rax, BYTE {}", name_location(name, env)),
+                2 => format!("    movzx rax, WORD {}", name_location(name, env)),
                 8 => format!("    mov rax, {}", name_location(name, env)),
                 _ => unreachable!(),
             }
@@ -280,6 +289,15 @@ fn compile_expr(
 {right}
     add al, {left_stack_location}
     movsx rax, al"
+                    )
+                }
+                Type::I16 => {
+                    format!(
+                        "{left}
+    mov {left_stack_location}, ax
+{right}
+    add ax, {left_stack_location}
+    movsx rax, ax"
                     )
                 }
                 Type::I64 => {
@@ -322,6 +340,17 @@ fn compile_expr(
     mov al, BYTE {left_stack_location}
     sub al, bl
     movsx rax, al"
+                    )
+                }
+                Type::I16 => {
+                    format!(
+                        "{left}
+    mov {left_stack_location}, ax
+{right}
+    mov ebx, eax
+    mov ax, WORD {left_stack_location}
+    sub ax, bx
+    movsx rax, ax"
                     )
                 }
                 Type::I64 => {
@@ -367,6 +396,15 @@ fn compile_expr(
     movsx rax, al"
                     )
                 }
+                Type::I16 => {
+                    format!(
+                        "{left}
+    mov {left_stack_location}, ax
+{right}
+    imul WORD {left_stack_location}
+    movsx rax, ax"
+                    )
+                }
                 Type::I64 => {
                     format!(
                         "{left}
@@ -408,6 +446,18 @@ fn compile_expr(
     cdq                                   ; edx = signbit(eax)
     idiv ebx
     movsx rax, al"
+                    )
+                }
+                Type::I16 => {
+                    format!(
+                        "{left}
+    mov {left_stack_location}, ax
+{right}
+    mov ebx, eax
+    movsx eax, WORD {left_stack_location}
+    cdq                                   ; edx = signbit(eax)
+    idiv ebx
+    movsx rax, ax"
                     )
                 }
                 Type::I64 => {
@@ -458,6 +508,16 @@ fn compile_expr(
     movzx rax, al"
                     )
                 }
+                Type::I16 => {
+                    format!(
+                        "{left_ins}
+    mov {left_stack_location}, ax
+{right_ins}
+    cmp ax, {left_stack_location}
+    setg al
+    movzx rax, al"
+                    )
+                }
                 Type::I64 => {
                     format!(
                         "{left_ins}
@@ -499,6 +559,16 @@ fn compile_expr(
     mov {left_stack_location}, al
 {right_ins}
     cmp al, {left_stack_location}
+    setl al
+    movzx rax, al"
+                    )
+                }
+                Type::I16 => {
+                    format!(
+                        "{left_ins}
+    mov {left_stack_location}, ax
+{right_ins}
+    cmp ax, {left_stack_location}
     setl al
     movzx rax, al"
                     )
@@ -548,6 +618,16 @@ fn compile_expr(
     movzx rax, al"
                     )
                 }
+                Type::I16 => {
+                    format!(
+                        "{left_ins}
+    mov {left_stack_location}, ax
+{right_ins}
+    cmp ax, {left_stack_location}
+    setge al
+    movzx rax, al"
+                    )
+                }
                 Type::I64 => {
                     format!(
                         "{left_ins}
@@ -593,6 +673,16 @@ fn compile_expr(
     movzx rax, al"
                     )
                 }
+                Type::I16 => {
+                    format!(
+                        "{left_ins}
+    mov {left_stack_location}, ax
+{right_ins}
+    cmp ax, {left_stack_location}
+    setle al
+    movzx rax, al"
+                    )
+                }
                 Type::I64 => {
                     format!(
                         "{left_ins}
@@ -634,6 +724,16 @@ fn compile_expr(
     mov {left_stack_location}, al
 {right_ins}
     cmp al, {left_stack_location}
+    sete al
+    movzx rax, al"
+                    )
+                }
+                Type::I16 => {
+                    format!(
+                        "{left_ins}
+    mov {left_stack_location}, ax
+{right_ins}
+    cmp ax, {left_stack_location}
     sete al
     movzx rax, al"
                     )
