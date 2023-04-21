@@ -7,6 +7,7 @@ pub enum ExprKind {
     Boolean(bool),
     Int8(i8),
     Int16(i16),
+    Int32(i32),
     Int64(i64),
     Float64(f64),
     Identifier(String),
@@ -156,6 +157,7 @@ fn parse_integer(source: &String) -> Option<ExprKind> {
         0 | 64 => Some(ExprKind::Int64(sign * result)),
         8 => Some(ExprKind::Int8((sign * result) as i8)),
         16 => Some(ExprKind::Int16((sign * result) as i16)),
+        32 => Some(ExprKind::Int32((sign * result) as i32)),
         _ => None,
     }
 }
@@ -177,6 +179,8 @@ fn parse_type(sexpr: &SExpr) -> Result<Type, Error> {
     match sexpr {
         // Literal Types
         SExpr::Symbol(keyword) if keyword == "i8" => Ok(Type::I8),
+        SExpr::Symbol(keyword) if keyword == "i16" => Ok(Type::I16),
+        SExpr::Symbol(keyword) if keyword == "i32" => Ok(Type::I32),
         SExpr::Symbol(keyword) if keyword == "i64" => Ok(Type::I64),
         SExpr::Symbol(keyword) if keyword == "f64" => Ok(Type::F64),
         SExpr::Symbol(keyword) if keyword == "bool" => Ok(Type::Boolean),
@@ -435,9 +439,13 @@ mod tests {
 
         assert_symbol("25", ExprKind::Int64(25));
         assert_symbol("25i8", ExprKind::Int8(25));
+        assert_symbol("25i16", ExprKind::Int16(25));
+        assert_symbol("25i32", ExprKind::Int32(25));
         assert_symbol("25i64", ExprKind::Int64(25));
         assert_symbol("-25", ExprKind::Int64(-25));
         assert_symbol("-25i8", ExprKind::Int8(-25));
+        assert_symbol("-25i16", ExprKind::Int16(-25));
+        assert_symbol("-25i32", ExprKind::Int32(-25));
         assert_symbol("-25i64", ExprKind::Int64(-25));
         assert_symbol("25.0", ExprKind::Float64(25.0));
         assert_symbol("25.", ExprKind::Float64(25.0));

@@ -22,6 +22,7 @@ impl fmt::Display for Error {
 pub enum Type {
     I8,
     I16,
+    I32,
     I64,
     F64,
     Boolean,
@@ -64,6 +65,7 @@ fn check_expr(
             match (left, right) {
                 (Type::I8, Type::I8) => T!(Type::I8),
                 (Type::I16, Type::I16) => T!(Type::I16),
+                (Type::I32, Type::I32) => T!(Type::I32),
                 (Type::I64, Type::I64) => T!(Type::I64),
                 (Type::F64, Type::F64) => T!(Type::F64),
                 _ => Err(Error::TypeMismatch),
@@ -79,10 +81,9 @@ fn check_expr(
             match (left, right) {
                 (Type::I8, Type::I8)
                 | (Type::I16, Type::I16)
+                | (Type::I32, Type::I32)
                 | (Type::I64, Type::I64)
-                | (Type::F64, Type::F64) => {
-                    T!(Type::Boolean)
-                }
+                | (Type::F64, Type::F64) => T!(Type::Boolean),
                 _ => Err(Error::TypeMismatch),
             }
         }};
@@ -92,6 +93,7 @@ fn check_expr(
         ExprKind::Boolean(_) => T!(Type::Boolean),
         ExprKind::Int8(_) => T!(Type::I8),
         ExprKind::Int16(_) => T!(Type::I16),
+        ExprKind::Int32(_) => T!(Type::I32),
         ExprKind::Int64(_) => T!(Type::I64),
         ExprKind::Float64(_) => T!(Type::F64),
         ExprKind::Identifier(name) => T!(name_record(name, env)?.type_),
