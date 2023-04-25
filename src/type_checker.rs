@@ -24,6 +24,7 @@ pub enum Type {
     I16,
     I32,
     I64,
+    F32,
     F64,
     Boolean,
     Fn(Vec<Type>, Box<Type>),
@@ -67,6 +68,7 @@ fn check_expr(
                 (Type::I16, Type::I16) => T!(Type::I16),
                 (Type::I32, Type::I32) => T!(Type::I32),
                 (Type::I64, Type::I64) => T!(Type::I64),
+                (Type::F32, Type::F32) => T!(Type::F32),
                 (Type::F64, Type::F64) => T!(Type::F64),
                 _ => Err(Error::TypeMismatch),
             }
@@ -83,6 +85,7 @@ fn check_expr(
                 | (Type::I16, Type::I16)
                 | (Type::I32, Type::I32)
                 | (Type::I64, Type::I64)
+                | (Type::F32, Type::F32)
                 | (Type::F64, Type::F64) => T!(Type::Boolean),
                 _ => Err(Error::TypeMismatch),
             }
@@ -95,6 +98,7 @@ fn check_expr(
         ExprKind::Int16(_) => T!(Type::I16),
         ExprKind::Int32(_) => T!(Type::I32),
         ExprKind::Int64(_) => T!(Type::I64),
+        ExprKind::Float32(_) => T!(Type::F32),
         ExprKind::Float64(_) => T!(Type::F64),
         ExprKind::Identifier(name) => T!(name_record(name, env)?.type_),
         ExprKind::Add(left, right) => tc_arithmetic!(left, right),

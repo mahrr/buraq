@@ -24,6 +24,7 @@ fn find_lambda_captures_expr(
         | ExprKind::Int16(_)
         | ExprKind::Int32(_)
         | ExprKind::Int64(_)
+        | ExprKind::Float32(_)
         | ExprKind::Float64(_) => {}
         ExprKind::Identifier(id) => match current_scope.iter().rev().find(|&name| name == id) {
             Some(_) => {} // already exists in the **current** lexical scope
@@ -164,16 +165,16 @@ fn generate_distinct_label(label: &str) -> String {
     format!("{}_{}", label, id)
 }
 
-fn generate_lambda_label(id: u64) -> String {
+fn label_lambda(id: u64) -> String {
     // this won't clash with any function names, since the symbol `$` is escaped
     // in function labels
     format!("_lam_${}", id)
 }
 
-fn generate_f64_label(id: u64) -> String {
+fn label_float(id: u64) -> String {
     // this won't clash with any function names, since the symbol `$` is escaped
     // in function labels
-    format!("_f64_${}", id)
+    format!("_float_${}", id)
 }
 
 // buraq identifiers are sequence of non-terminating characters, i.e., whitespace
@@ -211,6 +212,7 @@ fn type_size(type_: &Type) -> i64 {
         Type::I16 => 2,
         Type::I32 => 4,
         Type::I64 => 8,
+        Type::F32 => 4,
         Type::F64 => 8,
         Type::Boolean => 1,
         Type::Fn(_, _) => 8, // functions are pointers
@@ -257,10 +259,15 @@ fn compile_expr(
         ExprKind::Int16(number) => format!("    mov eax, {}", number),
         ExprKind::Int32(number) => format!("    mov eax, {}", number),
         ExprKind::Int64(number) => format!("    mov rax, {}", number),
+        ExprKind::Float32(_) => format!(
+            "    movss xmm0, DWORD [{}]
+    movd eax, xmm0",
+            label_float(expr.id)
+        ),
         ExprKind::Float64(_) => format!(
             "    movsd xmm0, QWORD [{}]
     movq rax, xmm0",
-            generate_f64_label(expr.id)
+            label_float(expr.id)
         ),
 
         // identifier
@@ -319,6 +326,16 @@ fn compile_expr(
     mov {left_stack_location}, rax
 {right}
     add rax, {left_stack_location}"
+                    )
+                }
+                Type::F32 => {
+                    format!(
+                        "{left}
+    mov {left_stack_location}, eax
+{right}
+    movd xmm0, eax
+    addss xmm0, DWORD {left_stack_location}
+    movd eax, xmm0"
                     )
                 }
                 Type::F64 => {
@@ -387,6 +404,17 @@ fn compile_expr(
     sub rax, rdi"
                     )
                 }
+                Type::F32 => {
+                    format!(
+                        "{left}
+    mov {left_stack_location}, eax
+{right}
+    movss xmm0, DWORD {left_stack_location}
+    movd xmm1, eax
+    subss xmm0, xmm1
+    movd eax, xmm0"
+                    )
+                }
                 Type::F64 => {
                     format!(
                         "{left}
@@ -444,6 +472,16 @@ fn compile_expr(
     mov {left_stack_location}, rax
 {right}
     imul QWORD {left_stack_location}"
+                    )
+                }
+                Type::F32 => {
+                    format!(
+                        "{left}
+    mov {left_stack_location}, eax
+{right}
+    movd xmm0, eax
+    mulss xmm0, DWORD {left_stack_location}
+    movd eax, xmm0"
                     )
                 }
                 Type::F64 => {
@@ -516,6 +554,17 @@ fn compile_expr(
     idiv rdi"
                     )
                 }
+                Type::F32 => {
+                    format!(
+                        "{left}
+    mov {left_stack_location}, eax
+{right}
+    movss xmm0, DWORD {left_stack_location}
+    movd xmm1, eax
+    divss xmm0, xmm1
+    movd eax, xmm0"
+                    )
+                }
                 Type::F64 => {
                     format!(
                         "{left}
@@ -580,6 +629,17 @@ fn compile_expr(
 {right_ins}
     cmp rax, {left_stack_location}
     setg al
+    movzx rax, al"
+                    )
+                }
+                Type::F32 => {
+                    format!(
+                        "{left_ins}
+    mov {left_stack_location}, eax
+{right_ins}
+    movd xmm0, eax
+    comiss xmm0, DWORD {left_stack_location}
+    seta al
     movzx rax, al"
                     )
                 }
@@ -648,6 +708,17 @@ fn compile_expr(
     movzx rax, al"
                     )
                 }
+                Type::F32 => {
+                    format!(
+                        "{left_ins}
+    mov {left_stack_location}, eax
+{right_ins}
+    movd xmm0, eax
+    comiss xmm0, DWORD {left_stack_location}
+    setb al
+    movzx rax, al"
+                    )
+                }
                 Type::F64 => {
                     format!(
                         "{left_ins}
@@ -710,6 +781,17 @@ fn compile_expr(
 {right_ins}
     cmp rax, {left_stack_location}
     setge al
+    movzx rax, al"
+                    )
+                }
+                Type::F32 => {
+                    format!(
+                        "{left_ins}
+    mov {left_stack_location}, eax
+{right_ins}
+    movd xmm0, eax
+    comiss xmm0, DWORD {left_stack_location}
+    setae al
     movzx rax, al"
                     )
                 }
@@ -778,6 +860,17 @@ fn compile_expr(
     movzx rax, al"
                     )
                 }
+                Type::F32 => {
+                    format!(
+                        "{left_ins}
+    mov {left_stack_location}, eax
+{right_ins}
+    movd xmm0, eax
+    comiss xmm0, DWORD {left_stack_location}
+    setbe al
+    movzx rax, al"
+                    )
+                }
                 Type::F64 => {
                     format!(
                         "{left_ins}
@@ -839,6 +932,17 @@ fn compile_expr(
     mov {left_stack_location}, rax
 {right_ins}
     cmp rax, {left_stack_location}
+    sete al
+    movzx rax, al"
+                    )
+                }
+                Type::F32 => {
+                    format!(
+                        "{left_ins}
+    mov {left_stack_location}, eax
+{right_ins}
+    movd xmm0, eax
+    comiss xmm0, DWORD {left_stack_location}
     sete al
     movzx rax, al"
                     )
@@ -959,7 +1063,7 @@ fn compile_expr(
             seq_ins
         }
         ExprKind::Lambda(parameters, _, body, _captures) => {
-            let lambda_label = generate_lambda_label(expr.id);
+            let lambda_label = label_lambda(expr.id);
             let after_lambda_label = generate_distinct_label("after_lambda");
             let previous_env_count = env.len();
             let mut stack_index = 0i64;
@@ -1176,7 +1280,8 @@ fn compile_expr_data(expr: &Expr) -> String {
     use ExprKind::*;
 
     match &expr.kind {
-        Float64(number) => format!("{}:\n    dq {:e}\n", generate_f64_label(expr.id), number),
+        Float32(number) => format!("{}:\n    dd {:e}\n", label_float(expr.id), number),
+        Float64(number) => format!("{}:\n    dq {:e}\n", label_float(expr.id), number),
         Add(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
         Sub(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),
         Mul(left, right) => format!("{}{}", compile_expr_data(left), compile_expr_data(right)),

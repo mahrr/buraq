@@ -9,6 +9,7 @@ pub enum ExprKind {
     Int16(i16),
     Int32(i32),
     Int64(i64),
+    Float32(f32),
     Float64(f64),
     Identifier(String),
     Add(Box<Expr>, Box<Expr>), // left, right
@@ -72,9 +73,10 @@ fn generate_id() -> u64 {
     id
 }
 
-fn parse_float(source: &String) -> Option<f64> {
+fn parse_float(source: &String) -> Option<ExprKind> {
     let mut sign = 1f64;
     let mut result = 0f64;
+    let mut bit_size = 0i64; // 0 indicates no size (default to f64)
     let mut chars = source.chars().peekable();
 
     if let Some('-') = chars.peek() {
@@ -99,17 +101,32 @@ fn parse_float(source: &String) -> Option<f64> {
     }
 
     let mut fraction_digit = 10f64;
+    let mut consuming_bit_size = false;
+
     while let Some(ch) = chars.next() {
+        if ch == 'f' {
+            consuming_bit_size = true;
+            continue;
+        }
+
         match ch.to_digit(10) {
             Some(number) => {
-                result += (number as f64) / fraction_digit;
-                fraction_digit *= 10.0;
+                if consuming_bit_size == false {
+                    result += (number as f64) / fraction_digit;
+                    fraction_digit *= 10.0;
+                } else {
+                    bit_size = bit_size * 10 + number as i64;
+                }
             }
             None => return None,
         }
     }
 
-    return Some(result * sign);
+    match bit_size {
+        0 | 64 => Some(ExprKind::Float64(sign * result)),
+        32 => Some(ExprKind::Float32((sign * result) as f32)),
+        _ => None,
+    }
 }
 
 fn parse_integer(source: &String) -> Option<ExprKind> {
@@ -236,11 +253,11 @@ pub fn parse_expr(sexpr: &SExpr) -> Result<Expr, Error> {
 
     match sexpr {
         Symbol(symbol) => {
-            if let Some(expr) = parse_integer(&symbol) {
+            if let Some(expr) = parse_float(&symbol) {
                 return E!(expr);
             }
-            if let Some(number) = parse_float(&symbol) {
-                return E!(ExprKind::Float64(number));
+            if let Some(expr) = parse_integer(&symbol) {
+                return E!(expr);
             }
             if symbol == "true" {
                 return E!(ExprKind::Boolean(true));
@@ -434,9 +451,11 @@ mod tests {
             assert_eq!(expr.kind, kind);
         }
 
+        // booleans
         assert_symbol("true", ExprKind::Boolean(true));
         assert_symbol("false", ExprKind::Boolean(false));
 
+        // integers
         assert_symbol("25", ExprKind::Int64(25));
         assert_symbol("25i8", ExprKind::Int8(25));
         assert_symbol("25i16", ExprKind::Int16(25));
@@ -447,6 +466,8 @@ mod tests {
         assert_symbol("-25i16", ExprKind::Int16(-25));
         assert_symbol("-25i32", ExprKind::Int32(-25));
         assert_symbol("-25i64", ExprKind::Int64(-25));
+
+        // floats
         assert_symbol("25.0", ExprKind::Float64(25.0));
         assert_symbol("25.", ExprKind::Float64(25.0));
         assert_symbol("25.25", ExprKind::Float64(25.25));
@@ -457,5 +478,21 @@ mod tests {
         assert_symbol("-25.25", ExprKind::Float64(-25.25));
         assert_symbol("-0.25", ExprKind::Float64(-0.25));
         assert_symbol("-.25", ExprKind::Float64(-0.25));
+        assert_symbol("25.25f32", ExprKind::Float32(25.25));
+        assert_symbol("0.25f32", ExprKind::Float32(0.25));
+        assert_symbol(".25f32", ExprKind::Float32(0.25));
+        assert_symbol("-25.0f32", ExprKind::Float32(-25.0));
+        assert_symbol("-25.f32", ExprKind::Float32(-25.0));
+        assert_symbol("-25.25f32", ExprKind::Float32(-25.25));
+        assert_symbol("-0.25f32", ExprKind::Float32(-0.25));
+        assert_symbol("-.25f32", ExprKind::Float32(-0.25));
+        assert_symbol("25.25f64", ExprKind::Float64(25.25));
+        assert_symbol("0.25f64", ExprKind::Float64(0.25));
+        assert_symbol(".25f64", ExprKind::Float64(0.25));
+        assert_symbol("-25.0f64", ExprKind::Float64(-25.0));
+        assert_symbol("-25.f64", ExprKind::Float64(-25.0));
+        assert_symbol("-25.25f64", ExprKind::Float64(-25.25));
+        assert_symbol("-0.25f64", ExprKind::Float64(-0.25));
+        assert_symbol("-.25f64", ExprKind::Float64(-0.25));
     }
 }
