@@ -4,6 +4,7 @@ use std::{
     process,
 };
 
+mod analysis;
 mod compiler;
 mod parser;
 mod sexpr;
